@@ -2,8 +2,8 @@ typedef struct {
     double** values;
     int rows;
     int cols;
-} Matrice;
-Matrice* matrice_create(int rows, int cols);
-void matrice_init(Matrice* matrice, int n);
-void matrice_free(Matrice* matrice);
-void matrice_print (Matrice* matrice);
+} Matrix;
+Matrix* matrix_create(int rows, int cols);
+void matrix_init(Matrix* matrix, int n);
+void matrix_free(Matrix* matrix);
+void matrix_print(Matrix* matrix);

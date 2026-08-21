@@ -1,37 +1,45 @@
-Matrice* matrice_create(int rows, int cols) {
-    Matrice matrice;
-    matrice->rows = rows;
-    matrice->cols = cols;
-    matrice->values = malloc(rows * sizeof(double*));
+Matrix* matrix_create(int rows, int cols) {
+    Matrix* matrix;
+    matrix->rows = rows;
+    matrix->cols = cols;
+    matrix->values = malloc(rows * sizeof(double*));
     for(int i = 0; i < rows; i++) {
-        matrice->values[i] = malloc(cols * sizeof(double));
+        matrix->values[i] = malloc(cols * sizeof(double));
     }
-    return matrice;
+    return matrix;
 }
 
-void matrice_init(Matrice* matrice, int n) {
-    for(int i = 0; i < matrice->rows; i++) {
-        for(int j = 0; j < matrice->cols; j++) {
-            matrice->values[i][j] = n;
+void matrix_init(Matrix* matrix, double n) {
+    for(int i = 0; i < matrix->rows; i++) {
+        for(int j = 0; j < matrix->cols; j++) {
+            matrix->values[i][j] = n;
         }
     }
 }
 
-void matrice_free(Matrice* matrice) {
-    for(int i = 0; i < matrice->rows ; i++) {
-        free(matrice->values[i]);
+void matrix_free(Matrix* matrix) {
+    for(int i = 0; i < matrix->rows ; i++) {
+        free(matrix->values[i]);
     }
-    free(matrice->values);
-    free(matrice);
-    matrice = NULL;
+    free(matrix->values);
+    free(matrix);
 }
 
-void matrice_print (Matrice* matrice) {
-    for(int i = 0; i < matrice->rows; i++) {
-        for(int j = 0; j < matrice->cols; j++) {
-            printf("Value at [%d][%d] is %1.3f", i, j, matrice->values[i][j]);
+void matrix_print(Matrix* matrix) {
+    for(int i = 0; i < matrix->rows; i++) {
+        for(int j = 0; j < matrix->cols; j++) {
+            printf("Value at [%d][%d] is %1.3f", i, j, matrix->values[i][j]);
         }
         printf("\n");
     }
 }
 
+Matrix* matrix_copy (Matrix* matrix) {
+    Matrix* copy_matrix = matrix_create(matrix->rows, matrix->cols);
+    for(int i = 0; i < matrix->rows; i++) {
+        for(int j = 0; j < matrix->cols; j++) {
+            copy_matrix->values[i][j] = matrix->values[i][j];
+        }
+    }
+    return copy_matrix;
+}
