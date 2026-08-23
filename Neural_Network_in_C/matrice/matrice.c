@@ -34,7 +34,7 @@ void matrix_print(Matrix* matrix) {
     }
 }
 
-Matrix* matrix_copy (Matrix* matrix) {
+Matrix* matrix_copy(Matrix* matrix) {
     Matrix* copy_matrix = matrix_create(matrix->rows, matrix->cols);
     for(int i = 0; i < matrix->rows; i++) {
         for(int j = 0; j < matrix->cols; j++) {
@@ -42,4 +42,16 @@ Matrix* matrix_copy (Matrix* matrix) {
         }
     }
     return copy_matrix;
+}
+
+void matrix_save(Matrix* matrix, char* file_name) {
+    FILE* file = fopen(file_name, "w");
+    fprintf(file, "%d\n", matrix->rows);
+    fprintf(file, "%d\n", matrix->cols);
+    for(int i = 0; i < matrix->rows; i++) {
+        for(int j = 0; j < matrix->cols; j++) {
+            fprintf(file, "%.6f\n", matrix->values[i][j]);
+        }
+    }
+    printf("NN Succesfully saved to %s \n", file_name);
 }
