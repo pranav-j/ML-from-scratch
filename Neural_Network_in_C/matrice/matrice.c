@@ -1,3 +1,5 @@
+#define LINE_LEN 100
+
 Matrix* matrix_create(int rows, int cols) {
     Matrix* matrix;
     matrix->rows = rows;
@@ -46,6 +48,10 @@ Matrix* matrix_copy(Matrix* matrix) {
 
 void matrix_save(Matrix* matrix, char* file_name) {
     FILE* file = fopen(file_name, "w");
+    if(!file) {
+        perror(file_name);
+        return;
+    }
     fprintf(file, "%d\n", matrix->rows);
     fprintf(file, "%d\n", matrix->cols);
     for(int i = 0; i < matrix->rows; i++) {
@@ -53,5 +59,42 @@ void matrix_save(Matrix* matrix, char* file_name) {
             fprintf(file, "%.6f\n", matrix->values[i][j]);
         }
     }
-    printf("NN Succesfully saved to %s \n", file_name);
+    if(fclose(file) != 0) {
+        perror("fopen");
+        return;
+    }
+    printf("Matrix Succesfully saved to %s \n", file_name);
+}
+
+Matrix* matrix_load(char* file_name) {
+    FILE* file = fopen(file_name, "r");
+    if(!file) {
+        perror(file_name);
+        return NULL;
+    }
+    int LINE_LEN = 100;
+    char line[LINE_LEN];
+    if(!fgets(line, LINE_LEN, file)) { fclose(file); return NULL };
+    int rows = atoi(line);
+    if(!fgets(line, LINE_LEN, file)) { fclose(file); return NULL };
+    int cols = atoi(line);
+
+    Matrix* matrix = matrix_create(rows, cols);
+    for(int i = 0; i < rows; i++) {
+        for(int j = 0; j < cols; j++) {
+            if(!fgets(line, LINE_LEN, file)) {
+                matrix_free(matrix);
+                fclose(file);
+                return NULL;
+            }
+            matrix->values[i][j] = strtod(line, NULL);
+        }
+    }
+    if(fclose(file) != 0) {
+        perror("Error loading matrix ");
+        matrix_free(matrix);
+        return NULL;
+    }
+    printf("Matrix loaded successfully! \n");
+    return matrix;
 }
