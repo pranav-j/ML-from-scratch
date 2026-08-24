@@ -12,3 +12,4 @@ void matrix_save(Matrix* matrix, char* file_name);
 Matrix* matrix_load(char* file_name);
 double uniform_distribution(double low, double high);
 void matrix_randomize(Matrix* m, int n);
+int matrix_argmax(Matrix* matrix);

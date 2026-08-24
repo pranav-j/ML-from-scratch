@@ -121,3 +121,16 @@ void matrix_randomize(Matrix* matrix, int n) {
 		}
 	}
 }
+
+int matrix_argmax(Matrix* matrix) {
+    // Expects a single column matrix.
+    int max_value = 0;
+    int max_idx = 0;
+    for( int i = 0; i < matrix->rows) {
+        if (matrix->values[i][0] > max_value) { 
+            max_idx = i; 
+            max_value = matrix->values[i][0];
+        }
+    }
+    return max_idx;
+}
