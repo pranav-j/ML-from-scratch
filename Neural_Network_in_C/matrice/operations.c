@@ -50,3 +50,22 @@ Matrix* add(Matrix* m1, Matrix* m2) {
 
     return out;
 }
+
+Matrix* subtract(Matrix* m1, Matrix* m2) {
+    if((m1->rows != m2->rows) || (m1->cols != m2->cols)) {
+        fprintf(stderr, "matrix subtract: shape mismatch (%dx%d - %dx%d)\n",
+                m1->rows, m1->cols, m2->rows, m2->cols);
+        return NULL;
+    }
+
+    Matrix* out = matrix_create(m1->rows, m1->cols);
+    if(!out) return NULL;
+
+    for(int i = 0; i < m1->rows; i++) {
+        for(int j = 0; j < m1->cols; j++) {
+            out->values[i][j] = m1->values[i][j] - m2->values[i][j];
+        }
+    }
+
+    return out;
+}
