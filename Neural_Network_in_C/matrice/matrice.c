@@ -134,3 +134,33 @@ int matrix_argmax(Matrix* matrix) {
     }
     return max_idx;
 }
+
+Matrix* matrix_flatten(Matrix* matrix, int axis) {
+    Matrix* out_mat;
+    if(axis == 0) {
+        out_mat = matrix_create(matrix->rows * matrix->cols, 1);
+    } else if(axis == 1) {
+        out_mat = matrix_create(1, matrix->rows * matrix->cols);
+    } else {
+        printf("Axis should be 1 or 0 \n");
+        return NULL;
+    }
+    if(!out_mat) return NULL;
+
+    if(axis == 0) {
+        for( int i = 0; i < matrix->rows; i++) {
+            for( int j = 0; j < matrix->cols; j++) {
+                out_mat->values[i * matrix->cols + j][0] = matrix->values[i][j];
+            }
+        }
+    } else {
+        for( int i = 0; i < matrix->rows; i++) {
+            for( int j = 0; j < matrix->cols; j++) {
+                out_mat->values[0][i * matrix->cols + j] = matrix->values[i][j];
+            }
+        }
+    }
+
+
+    return out_mat;
+}

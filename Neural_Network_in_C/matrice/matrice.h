@@ -13,3 +13,4 @@ Matrix* matrix_load(char* file_name);
 double uniform_distribution(double low, double high);
 void matrix_randomize(Matrix* m, int n);
 int matrix_argmax(Matrix* matrix);
+Matrix* matrix_flatten(Matrix* matrix, int axis);
