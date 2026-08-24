@@ -1,3 +1,8 @@
+#include "matrix.h"
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #define LINE_LEN 100
 
 Matrix* matrix_create(int rows, int cols) {
@@ -99,10 +104,20 @@ Matrix* matrix_load(char* file_name) {
     return matrix;
 }
 
-// There are issues with this, fine for now.
+// There are issues with this, but fine for now.
 double uniform_distribution(double low, double high) {
 	double difference = high - low;
 	int scale = 10000;
 	int scaled_difference = (int)(difference * scale);
 	return low + (1.0 * (rand() % scaled_difference) / scale);
+}
+
+void matrix_randomize(Matrix* matrix, int n) {
+	double min = -1.0 / sqrt(n);
+	double max = 1.0 / sqrt(n);
+	for (int i = 0; i < matrix->rows; i++) {
+		for (int j = 0; j < matrix->cols; j++) {
+			matrix->values[i][j] = uniform_distribution(min, max);
+		}
+	}
 }
