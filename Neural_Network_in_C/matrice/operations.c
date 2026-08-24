@@ -124,3 +124,16 @@ Matrix* transpose(Matrix* matrix) {
     }
     return out;
 }
+
+Matrix* apply(double (*func)(double), Matrix* matrix) {
+    Matrix* out = matrix_create(matrix->rows, matrix->cols);
+    if(!out) return NULL;
+    
+    for(int i =0; i < matrix->rows; i++) {
+        for(int j = 0; j < matrix->cols; j++) {
+            out->values[i][j] = (*func)(matrix->values[i][j]);
+            // out->values[i][j] = func(matrix->values[i][j]);      //Same as above.
+        }
+    }
+    return out;
+}
