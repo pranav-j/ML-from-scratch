@@ -3,4 +3,6 @@ Matrix* dot(Matrix* m1, Matrix* m2);
 Matrix* multiply(Matrix* m1, Matrix* m2)
 Matrix* add(Matrix* m1, Matrix* m2);
 Matrix* subtract(Matrix* m1, Matrix* m2);
-Matrix* scale(Matrix* matrix, double n)
+Matrix* scale(Matrix* matrix, double n);
+Matrix* add_scalar(Matrix* matrix, double n);
+Matrix* transpose(Matrix* matrix);

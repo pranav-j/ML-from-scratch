@@ -92,10 +92,34 @@ Matrix* subtract(Matrix* m1, Matrix* m2) {
 Matrix* scale(Matrix* matrix, double n) {
     Matrix* out = matrix_create(matrix->rows, matrix->cols);
     if(!out) return NULL;
-    
+
     for(int i = 0; i < matrix->rows; i++) {
         for(int j = 0; j< matrix-> cols; j++) {
             out->values[i][j] = matrix->values[i][j] * n;
+        }
+    }
+    return out;
+}
+
+Matrix* add_scalar(Matrix* matrix, double n) {
+    Matrix* out = matrix_create(matrix->rows, matrix->cols);
+    if(!out) return NULL;
+    
+    for(int i = 0; i < matrix->rows; i++) {
+        for(int j = 0; j< matrix-> cols; j++) {
+            out->values[i][j] = matrix->values[i][j] + n;
+        }
+    }
+    return out;
+}
+
+Matrix* transpose(Matrix* matrix) {
+    Matrix* out = matrix_create(matrix->rows, matrix->cols);
+    if(!out) return NULL;
+    
+    for(int i = 0; i < matrix->rows; i++) {
+        for(int j = 0; j< matrix-> cols; j++) {
+            out->values[j][i] = matrix->values[i][j];
         }
     }
     return out;
