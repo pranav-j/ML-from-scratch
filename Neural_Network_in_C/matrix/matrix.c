@@ -6,7 +6,7 @@
 #define LINE_LEN 100
 
 Matrix* matrix_create(int rows, int cols) {
-    Matrix* matrix;
+    Matrix* matrix = malloc(sizeof(Matrix));
     matrix->rows = rows;
     matrix->cols = cols;
     matrix->values = malloc(rows * sizeof(double*));
@@ -124,9 +124,9 @@ void matrix_randomize(Matrix* matrix, int n) {
 
 int matrix_argmax(Matrix* matrix) {
     // Expects a single column matrix.
-    int max_value = 0;
+    int max_value = matrix->values[0][0];
     int max_idx = 0;
-    for( int i = 0; i < matrix->rows) {
+    for( int i = 0; i < matrix->rows; i++) {
         if (matrix->values[i][0] > max_value) { 
             max_idx = i; 
             max_value = matrix->values[i][0];

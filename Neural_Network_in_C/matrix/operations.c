@@ -10,21 +10,21 @@ int check_dimentional_equality(Matrix* m1, Matrix* m2) {
 
 Matrix* dot(Matrix* m1, Matrix* m2) {
     if(m1->cols != m2->rows) {
-        fprintf(stderr, "matrix multiply: shape mismatch (%dx%d * %dx%d)\n",
+        fprintf(stderr, "matrix hadamard: shape mismatch (%dx%d * %dx%d)\n",
                 m1->rows, m1->cols, m2->rows, m2->cols);
         return NULL;
     }
 
-    Matrix* out_mat = matrix_create(m2->rows, m1->cols);
+    Matrix* out_mat = matrix_create(m1->rows, m2->cols);
     if(!out_mat) return NULL;
 
     for( int i = 0; i < m1->rows; i++) {
-        for( int k = 0; k < m2->cols; k++) {
+        for( int j = 0; j < m2->cols; j++) {
             double sum = 0.0;
-            for( int j = 0; j < m2->cols; j++) {
-                sum += m1->values[i][j] * m2->values[j][i];
+            for( int k = 0; k < m2->cols; k++) {
+                sum += m1->values[i][k] * m2->values[k][j];
             }
-            out_mat->values[i][k] = sum;
+            out_mat->values[i][j] = sum;
         }
 
     }
@@ -32,7 +32,7 @@ Matrix* dot(Matrix* m1, Matrix* m2) {
     return out_mat;
 }
 
-Matrix* multiply(Matrix* m1, Matrix* m2) {
+Matrix* hadamard(Matrix* m1, Matrix* m2) {
     if(!check_dimentional_equality(m1, m2)) {
         fprintf(stderr, "matrix add: shape mismatch (%dx%d + %dx%d)\n",
                 m1->rows, m1->cols, m2->rows, m2->cols);
@@ -114,7 +114,7 @@ Matrix* add_scalar(Matrix* matrix, double n) {
 }
 
 Matrix* transpose(Matrix* matrix) {
-    Matrix* out = matrix_create(matrix->rows, matrix->cols);
+    Matrix* out = matrix_create(matrix->cols, matrix->rows);
     if(!out) return NULL;
     
     for(int i = 0; i < matrix->rows; i++) {
