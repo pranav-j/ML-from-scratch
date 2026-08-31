@@ -26,3 +26,13 @@ NeuralNetwork* nn_create(int num_inputs, int num_hiddens, int num_outputs, doubl
     nn->output_weights = output_layer;
     return nn;
 }
+
+void nn_free(NeuralNetwork* nn) {
+    if(!nn) return NULL;
+
+    matrix_init(nn->W1, 0);
+    matrix_init(nn->b1, 0);
+    matrix_init(nn->W2, 0);
+    matrix_init(nn->b2, 0);
+    free(nn);
+}

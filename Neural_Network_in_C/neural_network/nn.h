@@ -12,3 +12,4 @@ typedef struct {
 } NeuraNetwork;
 
 NeuralNetwork* nn_create(int num_inputs, int num_hiddens, int num_outputs, double learning_rate);
+void nn_free(NeuralNetwork* nn);
