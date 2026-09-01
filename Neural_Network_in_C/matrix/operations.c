@@ -137,3 +137,12 @@ Matrix* apply(double (*func)(double), Matrix* matrix) {
     }
     return out;
 }
+
+
+Matrix* matrix_update(Matrix* matrix, Matrix* gradient, double learning_rate) {
+    for(int i = 0; i < matrix->rows; i++) {
+        for(int j = 0; j < matrix->cols; j++) {
+            matrix->values[i][j] -= learning_rate * gradient->values[i][j];
+        }
+    }
+}

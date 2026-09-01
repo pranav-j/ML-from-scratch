@@ -7,3 +7,4 @@ Matrix* scale(Matrix* matrix, double n);
 Matrix* add_scalar(Matrix* matrix, double n);
 Matrix* transpose(Matrix* matrix);
 Matrix* apply(double (*func)(double), Matrix* matrix);
+Matrix* matrix_update(Matrix* matrix, Matrix* gradient, double learning_rate);
