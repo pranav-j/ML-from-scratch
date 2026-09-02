@@ -36,3 +36,16 @@ void nn_free(NeuralNetwork* nn) {
     matrix_init(nn->b2, 0);
     free(nn);
 }
+
+void forward(NeuralNetwork* nn, Matrix* x, Matrix** z1, Matrix** a1, Matrix** z2, Matrix** a2) {
+    Matrix* W1x = dot(nn->W1, x);
+    *z1 = add(W1x, nn->b1);
+    matrix_free(W1x);
+
+    *a1 = apply(sigmoid, *z1);
+
+    Matrix* W2a1 = dot(nn->W2, *a1);
+    *z2 = add(W2a1, nn->b2);
+
+    *a2 = softmax(*z2);
+}
