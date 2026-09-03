@@ -115,3 +115,10 @@ Matrix* nn_predict(NeuralNetwork* nn, Matrix* x) {
     return a2;
 }
 
+int nn_predict_class(NeuralNetwork* nn, Matrix* x) {
+    Matrix* a2 = nn_predict(nn, x);
+    int c = matrix_argmax(a2);
+    matrix_free(a2);
+    
+    return c;
+}
