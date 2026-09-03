@@ -103,3 +103,15 @@ double nn_train_one(NeuralNetwork* nn, Matrix* x, Matrix* y) {
 
     return loss;
 }
+
+Matrix* nn_predict(NeuralNetwork* nn, Matrix* x) {
+    Matrix *z1, *a1, *z2, *a2;
+    forward(NeuralNetwork* nn, Matrix* x, &z1, &a1, &z2, &a2);
+    matrix_free(z1);
+    matrix_free(a1);
+    matrix_free(z2);
+    matrix_free(b2);
+
+    return a2;
+}
+
