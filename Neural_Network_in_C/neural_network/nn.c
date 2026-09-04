@@ -26,13 +26,11 @@ NeuralNetwork* nn_create(int num_inputs, int num_hiddens, int num_outputs, doubl
     matrix_randomize(nn->W2, num_hiddens);
     matrix_init(nn->b2, 0.0);
 
-    nn->hidden_weights = hidden_layer;
-    nn->output_weights = output_layer;
     return nn;
 }
 
 void nn_free(NeuralNetwork* nn) {
-    if(!nn) return NULL;
+    if(!nn) return;
 
     matrix_init(nn->W1, 0);
     matrix_init(nn->b1, 0);
@@ -76,7 +74,7 @@ double nn_train_one(NeuralNetwork* nn, Matrix* x, Matrix* y) {
 
     Matrix* da1 = dot(transpose(nn->W2), dz2);
     
-    Matrix* sp = apply(sigmoidPrime, a1);
+    Matrix* sp = apply(sigmoid_prime_from_a, a1);
     Matrix* dz1 = hadamard(da1, sp);
 
     Matrix* dW1 = dot(dz1, transpose(x));
@@ -107,7 +105,6 @@ Matrix* nn_predict(NeuralNetwork* nn, Matrix* x) {
     matrix_free(z1);
     matrix_free(a1);
     matrix_free(z2);
-    matrix_free(a2);
 
     return a2;
 }

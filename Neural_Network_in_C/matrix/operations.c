@@ -21,7 +21,7 @@ Matrix* dot(Matrix* m1, Matrix* m2) {
     for( int i = 0; i < m1->rows; i++) {
         for( int j = 0; j < m2->cols; j++) {
             double sum = 0.0;
-            for( int k = 0; k < m2->cols; k++) {
+            for( int k = 0; k < m1->cols; k++) {
                 sum += m1->values[i][k] * m2->values[k][j];
             }
             out_mat->values[i][j] = sum;

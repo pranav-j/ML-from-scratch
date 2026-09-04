@@ -3,21 +3,14 @@
 #include "../matrix/operations.h"
 
 #include <math.h>
+#include <stdlib.h>
 
 double sigmoid(double x) {
     return 1.0 / (1.0 + exp(-x));
 }
 
-Matrix* sigmoidPrime(Matrix* input) {
-    // Expects sigmoid as input. 
-    // σ′(x)=σ(x)⋅(1−σ(x))
-    Matrix* ones = matrix_create(input->rows, input->cols);
-    matrix_init(ones, 1);
-    Matrix* subtracted = subtract(ones, input);
-    Matrix* multiplied = hadamard(input, subtracted);
-    matrix_free(subtracted);
-    matrix_free(multiplied);
-    return multiplied;
+double sigmoid_prime_from_a(double a) {
+    return a * (1.0 - a);
 }
 
 Matrix* softmax(Matrix* matrix) {

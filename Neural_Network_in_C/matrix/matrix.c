@@ -77,7 +77,6 @@ Matrix* matrix_load(char* file_name) {
         perror(file_name);
         return NULL;
     }
-    int LINE_LEN = 100;
     char line[LINE_LEN];
     if(!fgets(line, LINE_LEN, file)) { fclose(file); return NULL; };
     int rows = atoi(line);
@@ -124,7 +123,7 @@ void matrix_randomize(Matrix* matrix, int n) {
 
 int matrix_argmax(Matrix* matrix) {
     // Expects a single column matrix.
-    int max_value = matrix->values[0][0];
+    double max_value = matrix->values[0][0];
     int max_idx = 0;
     for( int i = 0; i < matrix->rows; i++) {
         if (matrix->values[i][0] > max_value) { 

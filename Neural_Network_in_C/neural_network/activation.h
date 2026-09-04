@@ -4,7 +4,7 @@
 #include "../matrix/matrix.h"
 
 double sigmoid(double x);
-Matrix* sigmoidPrime(Matrix* input);
+double sigmoid_prime_from_a(double a);
 Matrix* softmax(Matrix* matrix);
 
 #endif
