@@ -1,3 +1,6 @@
+#ifndef MATRIX_H
+#define MATRIX_H
+
 typedef struct {
     double** values;
     int rows;
@@ -14,3 +17,5 @@ double uniform_distribution(double low, double high);
 void matrix_randomize(Matrix* m, int n);
 int matrix_argmax(Matrix* matrix);
 Matrix* matrix_flatten(Matrix* matrix, int axis);
+
+#endif

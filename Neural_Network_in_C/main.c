@@ -1,6 +1,6 @@
 #include "matrix/matrix.h"
 #include "neural_network/nn.h"
-#include "neural_network/mnist.h"
+#include "mnist_ops/mnist.h"
 
 #include <stdio.h>
 #include <stdlib.h>

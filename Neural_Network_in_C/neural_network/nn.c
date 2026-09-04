@@ -92,13 +92,10 @@ double nn_train_one(NeuralNetwork* nn, Matrix* x, Matrix* y) {
     // FREE INTERMEDIARIES
     matrix_free(z1); matrix_free(a1); matrix_free(z2); matrix_free(a2);
     matrix_free(dz2);   // this also disposes of db2 (same pointer)
-    matrix_free(a1_T);
     matrix_free(dW2);
-    matrix_free(W2_T);
     matrix_free(da1);
     matrix_free(sp);
     matrix_free(dz1);   // this also disposes of db1 (same pointer)
-    matrix_free(x_T);
     matrix_free(dW1);
 
     return loss;
@@ -106,11 +103,11 @@ double nn_train_one(NeuralNetwork* nn, Matrix* x, Matrix* y) {
 
 Matrix* nn_predict(NeuralNetwork* nn, Matrix* x) {
     Matrix *z1, *a1, *z2, *a2;
-    forward(NeuralNetwork* nn, Matrix* x, &z1, &a1, &z2, &a2);
+    forward(nn, x, &z1, &a1, &z2, &a2);
     matrix_free(z1);
     matrix_free(a1);
     matrix_free(z2);
-    matrix_free(b2);
+    matrix_free(a2);
 
     return a2;
 }

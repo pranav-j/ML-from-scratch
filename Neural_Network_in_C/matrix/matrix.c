@@ -79,9 +79,9 @@ Matrix* matrix_load(char* file_name) {
     }
     int LINE_LEN = 100;
     char line[LINE_LEN];
-    if(!fgets(line, LINE_LEN, file)) { fclose(file); return NULL };
+    if(!fgets(line, LINE_LEN, file)) { fclose(file); return NULL; };
     int rows = atoi(line);
-    if(!fgets(line, LINE_LEN, file)) { fclose(file); return NULL };
+    if(!fgets(line, LINE_LEN, file)) { fclose(file); return NULL; };
     int cols = atoi(line);
 
     Matrix* matrix = matrix_create(rows, cols);
