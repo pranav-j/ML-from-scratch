@@ -104,6 +104,281 @@ No other mysterious operation is involved. Training is repeated computation of t
 
 ---
 
+# 1A. Derivative flow at a glance
+
+This section is the **navigation map** for the entire derivation. Read it when you want to remember not just the final formulas, but **why each derivative was calculated and where it is plugged next**.
+
+## The forward dependency
+
+The network computes:
+
+\[
+ x
+ \rightarrow z^{(1)}
+ \rightarrow a^{(1)}
+ \rightarrow z^{(2)}
+ \rightarrow \hat y
+ \rightarrow L
+\]
+
+The parameter vectors/matrices sit in these transformations:
+
+\[
+W^{(1)},b^{(1)} \rightarrow z^{(1)}
+\]
+
+\[
+z^{(1)} \xrightarrow{\sigma} a^{(1)}
+\]
+
+\[
+W^{(2)},b^{(2)} \rightarrow z^{(2)}
+\]
+
+\[
+z^{(2)} \xrightarrow{\text{softmax}} \hat y
+\]
+
+\[
+\hat y,y \rightarrow L
+\]
+
+## The backward dependency
+
+We ultimately want:
+
+\[
+\frac{\partial L}{\partial W^{(1)}},\qquad
+\frac{\partial L}{\partial b^{(1)}},\qquad
+\frac{\partial L}{\partial W^{(2)}},\qquad
+\frac{\partial L}{\partial b^{(2)}}.
+\]
+
+But those are not calculated directly from the loss. We walk backward through the graph.
+
+The complete chain is:
+
+```text
+L
+│
+▼
+∂L/∂ŷ
+│
+│  combine with softmax derivative
+▼
+∂L/∂z²  =  δ²
+│
+├──────────────► ∂L/∂W²  ──► update W²
+│
+├──────────────► ∂L/∂b²  ──► update b²
+│
+│
+│  propagate through second affine layer
+▼
+∂L/∂a¹
+│
+│  multiply by sigmoid derivative
+▼
+∂L/∂z¹  =  δ¹
+│
+├──────────────► ∂L/∂W¹  ──► update W¹
+│
+└──────────────► ∂L/∂b¹  ──► update b¹
+```
+
+The crucial point is that **we do not update the sigmoid or softmax**. They have no trainable parameters in this network. We differentiate *through* them so that the gradient can reach the weights and biases.
+
+## What was calculated, and why?
+
+| Quantity calculated | Why it was needed | Where it goes next |
+|---|---|---|
+| \(\partial L/\partial\hat y\) | The loss depends directly on \(\hat y\) | Into the chain rule through softmax |
+| \(\partial\hat y/\partial z^{(2)}\) | Softmax connects logits to all probabilities | Combined with \(\partial L/\partial\hat y\) |
+| \(\partial L/\partial z^{(2)}\) | \(W^{(2)}\) and \(b^{(2)}\) directly produce \(z^{(2)}\) | Gives \(dW^{(2)}\), \(db^{(2)}\), and continues to \(a^{(1)}\) |
+| \(\partial L/\partial W^{(2)}\) | Needed to update the final weights | Gradient descent |
+| \(\partial L/\partial b^{(2)}\) | Needed to update the final biases | Gradient descent |
+| \(\partial L/\partial a^{(1)}\) | Need to continue backward through the sigmoid | Combine with sigmoid derivative |
+| \(\partial a^{(1)}/\partial z^{(1)}\) | Sigmoid connects \(z^{(1)}\) to \(a^{(1)}\) | Gives \(\partial L/\partial z^{(1)}\) |
+| \(\partial L/\partial z^{(1)}\) | \(W^{(1)}\) and \(b^{(1)}\) directly produce \(z^{(1)}\) | Gives \(dW^{(1)}\), \(db^{(1)}\) |
+| \(\partial L/\partial W^{(1)}\) | Needed to update the first-layer weights | Gradient descent |
+| \(\partial L/\partial b^{(1)}\) | Needed to update the first-layer biases | Gradient descent |
+
+## The exact chain-rule links
+
+The output side is:
+
+\[
+\boxed{
+\frac{\partial L}{\partial\hat y}
+\quad+
+\frac{\partial\hat y}{\partial z^{(2)}}
+\quad\Longrightarrow\quad
+\frac{\partial L}{\partial z^{(2)}}
+}
+\]
+
+Then:
+
+\[
+\boxed{
+\frac{\partial L}{\partial z^{(2)}}
+\quad+
+\frac{\partial z^{(2)}}{\partial W^{(2)}}
+\quad\Longrightarrow\quad
+\frac{\partial L}{\partial W^{(2)}}
+}
+\]
+
+and:
+
+\[
+\boxed{
+\frac{\partial L}{\partial z^{(2)}}
+\quad+
+\frac{\partial z^{(2)}}{\partial b^{(2)}}
+\quad\Longrightarrow\quad
+\frac{\partial L}{\partial b^{(2)}}
+}
+\]
+
+To continue toward the first layer:
+
+\[
+\boxed{
+\frac{\partial L}{\partial z^{(2)}}
+\quad+
+\frac{\partial z^{(2)}}{\partial a^{(1)}}
+\quad\Longrightarrow\quad
+\frac{\partial L}{\partial a^{(1)}}
+}
+\]
+
+Then cross the sigmoid:
+
+\[
+\boxed{
+\frac{\partial L}{\partial a^{(1)}}
+\quad+
+\frac{\partial a^{(1)}}{\partial z^{(1)}}
+\quad\Longrightarrow\quad
+\frac{\partial L}{\partial z^{(1)}}
+}
+\]
+
+Finally:
+
+\[
+\boxed{
+\frac{\partial L}{\partial z^{(1)}}
+\quad+
+\frac{\partial z^{(1)}}{\partial W^{(1)}}
+\quad\Longrightarrow\quad
+\frac{\partial L}{\partial W^{(1)}}
+}
+\]
+
+and:
+
+\[
+\boxed{
+\frac{\partial L}{\partial z^{(1)}}
+\quad+
+\frac{\partial z^{(1)}}{\partial b^{(1)}}
+\quad\Longrightarrow\quad
+\frac{\partial L}{\partial b^{(1)}}
+}
+\]
+
+## Final formulas, after all the derivations
+
+For quick recall:
+
+\[
+\boxed{
+\delta^{(2)}
+\equiv
+\frac{\partial L}{\partial z^{(2)}}
+=
+\hat y-y
+}
+\]
+
+\[
+\boxed{
+\frac{\partial L}{\partial W^{(2)}}
+=
+\delta^{(2)}(a^{(1)})^T
+}
+\]
+
+\[
+\boxed{
+\frac{\partial L}{\partial b^{(2)}}
+=
+\delta^{(2)}
+}
+\]
+
+\[
+\boxed{
+\frac{\partial L}{\partial a^{(1)}}
+=
+(W^{(2)})^T\delta^{(2)}
+}
+\]
+
+\[
+\boxed{
+\delta^{(1)}
+\equiv
+\frac{\partial L}{\partial z^{(1)}}
+=
+\left[(W^{(2)})^T\delta^{(2)}\right]
+\odot a^{(1)}\odot(1-a^{(1)})
+}
+\]
+
+\[
+\boxed{
+\frac{\partial L}{\partial W^{(1)}}
+=\delta^{(1)}x^T
+}
+\]
+
+\[
+\boxed{
+\frac{\partial L}{\partial b^{(1)}}
+=\delta^{(1)}
+}
+\]
+
+The flow can therefore be memorized as:
+
+\[
+\boxed{
+L
+\rightarrow
+\hat y
+\rightarrow
+z^{(2)}
+\rightarrow
+\left\{
+\begin{array}{c}
+W^{(2)},b^{(2)}\\
+\text{and}\ a^{(1)}
+\end{array}
+\right.
+\rightarrow
+z^{(1)}
+\rightarrow
+W^{(1)},b^{(1)}
+}
+\]
+
+The derivation is just the chain rule needed to make each arrow mathematically precise.
+
+---
+
 # 2. Network dimensions and notation
 
 We use column vectors throughout.
@@ -3969,7 +4244,7 @@ Stable implementation:
 
 # 68. Final “if I forget everything” map
 
-If you come back to this years later, start here.
+If you come back to this years later, start here. This section deliberately puts the **dependency structure first** and the **final derivative formulas second**.
 
 ### Forward
 
