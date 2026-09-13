@@ -573,7 +573,8 @@ This is the most important intermediate derivative because it directly unlocks t
 We know:
 
 \[
-z^{(2)}ightarrow\hat y\rightarrow L.
+z^{(2)}
+ightarrow\hat y\rightarrow L.
 \]
 
 Therefore we first want:
@@ -1528,7 +1529,8 @@ Thus:
 Now we have reached the quantity directly produced by the first affine layer:
 
 \[
-W^{(1)},b^{(1)}ightarrow z^{(1)}.
+W^{(1)},b^{(1)}
+ightarrow z^{(1)}.
 \]
 
 So we can finally calculate the first-layer parameter gradients.
@@ -1601,29 +1603,215 @@ exactly the shape of \(W^{(1)}\).
 
 # 22. Gradient of the first-layer bias
 
-Because:
+This step is deceptively short in the final formula, but it is important to understand **why** it is true. The key idea is the same chain-rule pattern used for every parameter gradient:
+
+> Find the gradient with respect to the quantity the parameter directly produces, then multiply by the local derivative of that quantity with respect to the parameter.
+
+Here the parameter is the first-layer bias:
 
 \[
-z^{(1)}_j=\cdots+b^{(1)}_j,
+b^{(1)}_j.
 \]
 
-we have:
+It directly appears in the first-layer preactivation:
 
 \[
+z^{(1)}_j
+=\sum_{i=1}^{784}W^{(1)}_{ji}x_i+b^{(1)}_j.
+\tag{22.1}
+\]
+
+Recall that earlier in the backward pass we defined:
+
+\[
+\boxed{
+\delta^{(1)}_j
+\equiv
+\frac{\partial L}{\partial z^{(1)}_j}.
+}
+\tag{22.2}
+\]
+
+So by the time we reach the bias, the upstream gradient we need is already known:
+
+\[
+\frac{\partial L}{\partial z^{(1)}_j}=\delta^{(1)}_j.
+\tag{22.3}
+\]
+
+Now ask: **how does changing $b^{(1)}_j$ change $z^{(1)}_j$?**
+
+From (22.1), $b^{(1)}_j$ appears as a plain additive term. Therefore:
+
+\[
+\boxed{
 \frac{\partial z^{(1)}_j}{\partial b^{(1)}_j}=1.
+}
+\tag{22.4}
+\]
+
+The chain rule now connects these two pieces:
+
+\[
+\frac{\partial L}{\partial b^{(1)}_j}
+=
+\frac{\partial L}{\partial z^{(1)}_j}
+\frac{\partial z^{(1)}_j}{\partial b^{(1)}_j}.
+\tag{22.5}
+\]
+
+Substitute (22.3) and (22.4):
+
+\[
+\frac{\partial L}{\partial b^{(1)}_j}
+=\delta^{(1)}_j\cdot1.
+\tag{22.6}
 \]
 
 Therefore:
 
 \[
 \boxed{
-\frac{\partial L}{\partial b^{(1)}}
-=\delta^{(1)}.
+\frac{\partial L}{\partial b^{(1)}_j}=\delta^{(1)}_j.
 }
-\tag{22.1}
+\tag{22.7}
 \]
 
-All four parameter gradients have now been obtained.
+## 22.1 Why do the other preactivations not contribute?
+
+A fully explicit multivariable chain rule makes the structure even clearer. We are differentiating the total loss with respect to one particular bias $b^{(1)}_j$. The loss depends on all 300 first-layer preactivations, so formally:
+
+\[
+\frac{\partial L}{\partial b^{(1)}_j}
+=
+\sum_{r=1}^{300}
+\frac{\partial L}{\partial z^{(1)}_r}
+\frac{\partial z^{(1)}_r}{\partial b^{(1)}_j}.
+\tag{22.8}
+\]
+
+Now consider $r\neq j$. The preactivation $z^{(1)}_r$ contains $b^{(1)}_r$, not $b^{(1)}_j$, so:
+
+\[
+\frac{\partial z^{(1)}_r}{\partial b^{(1)}_j}=0,\qquad r\neq j.
+\tag{22.9}
+\]
+
+For $r=j$:
+
+\[
+\frac{\partial z^{(1)}_j}{\partial b^{(1)}_j}=1.
+\tag{22.10}
+\]
+
+This can be written compactly using the Kronecker delta:
+
+\[
+\boxed{
+\frac{\partial z^{(1)}_r}{\partial b^{(1)}_j}=\delta_{rj}.
+}
+\tag{22.11}
+\]
+
+Substituting into (22.8):
+
+\[
+\frac{\partial L}{\partial b^{(1)}_j}
+=
+\sum_{r=1}^{300}
+\delta^{(1)}_r\delta_{rj}.
+\tag{22.12}
+\]
+
+The Kronecker delta kills every term except $r=j$:
+
+\[
+\frac{\partial L}{\partial b^{(1)}_j}
+=\delta^{(1)}_j.
+\tag{22.13}
+\]
+
+So the short derivation was not skipping any mysterious step; it was simply using the fact that each bias affects exactly one corresponding preactivation directly.
+
+## 22.2 Why the vector equation is just the componentwise result
+
+We have shown, for every hidden neuron $j=1,\ldots,300$, that:
+
+\[
+\frac{\partial L}{\partial b^{(1)}_j}=\delta^{(1)}_j.
+\tag{22.14}
+\]
+
+Therefore the entire gradient vector is:
+
+\[
+\boxed{
+\frac{\partial L}{\partial b^{(1)}}=\delta^{(1)}.
+}
+\tag{22.15}
+\]
+
+This is why the bias gradient is so simple: the local derivative of an additive bias is 1.
+
+## 22.3 Compare with the first-layer weight gradient
+
+The weight derivation follows exactly the same chain-rule template. From:
+
+\[
+z^{(1)}_j=\sum_iW^{(1)}_{ji}x_i+b^{(1)}_j,
+\]
+
+we have:
+
+\[
+\frac{\partial z^{(1)}_j}{\partial W^{(1)}_{ji}}=x_i.
+\tag{22.16}
+\]
+
+Therefore:
+
+\[
+\frac{\partial L}{\partial W^{(1)}_{ji}}
+=
+\frac{\partial L}{\partial z^{(1)}_j}
+\frac{\partial z^{(1)}_j}{\partial W^{(1)}_{ji}}
+=\delta^{(1)}_j x_i.
+\tag{22.17}
+\]
+
+Compare this with the bias:
+
+\[
+\frac{\partial L}{\partial b^{(1)}_j}
+=
+\frac{\partial L}{\partial z^{(1)}_j}
+\frac{\partial z^{(1)}_j}{\partial b^{(1)}_j}
+=\delta^{(1)}_j\cdot1.
+\tag{22.18}
+\]
+
+So the general pattern for an affine layer
+
+\[
+z=Wx+b
+\]
+
+is:
+
+\[
+\boxed{
+\frac{\partial L}{\partial W}=\delta x^T
+}
+\qquad
+\boxed{
+\frac{\partial L}{\partial b}=\delta.
+}
+\tag{22.19}
+\]
+
+The bias has no extra input factor because its local derivative is simply 1.
+
+**At this point all four parameter gradients have been obtained.**
 
 ---
 
