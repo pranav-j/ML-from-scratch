@@ -1,7 +1,7 @@
 #ifndef NN_H
 #define NN_H
 
-#include "../matrix/matrix.h"
+#include <matrix/matrix.h>
 
 typedef struct {
     int num_inputs;

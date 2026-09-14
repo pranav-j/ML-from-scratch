@@ -1,7 +1,7 @@
 #ifndef MNIST_H
 #define MNIST_H
 
-#include "../matrix/matrix.h"
+#include <matrix/matrix.h>
 
 typedef struct {
     Matrix* input;    // (784, 1) — normalized to [0, 1]

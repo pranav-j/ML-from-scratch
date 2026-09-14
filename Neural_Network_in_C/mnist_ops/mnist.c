@@ -1,5 +1,5 @@
 #include "mnist.h"
-#include "../matrix/matrix.h"
+#include <matrix/matrix.h>
 
 #include <stdio.h>
 #include <stdlib.h>

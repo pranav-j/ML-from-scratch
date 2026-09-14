@@ -1,6 +1,6 @@
 #include "activation.h"
-#include "../matrix/matrix.h"
-#include "../matrix/operations.h"
+#include <matrix/matrix.h>
+#include <matrix/operations.h>
 
 #include <math.h>
 #include <stdlib.h>

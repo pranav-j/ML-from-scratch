@@ -1,1 +1,12 @@
-/Neural_network_in_C/data
+/Neural_Network_in_C/data
+
+# Build artifacts
+*.o
+*.a
+*.dSYM/
+.DS_Store
+
+# Binaries
+/Neural_Network_in_C/nn
+/RNN_in_C/rnn
+/Linear_Regression_in_C/linear_regression

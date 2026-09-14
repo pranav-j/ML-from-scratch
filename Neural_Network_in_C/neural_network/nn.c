@@ -4,8 +4,8 @@
 
 #include "nn.h"
 #include "activation.h"
-#include "../matrix/matrix.h"
-#include "../matrix/operations.h"
+#include <matrix/matrix.h>
+#include <matrix/operations.h>
 
 NeuralNetwork* nn_create(int num_inputs, int num_hiddens, int num_outputs, double learning_rate) {
     NeuralNetwork* nn = malloc(sizeof(NeuralNetwork));

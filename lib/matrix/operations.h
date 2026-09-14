@@ -1,7 +1,7 @@
 #ifndef OPERATIONS_H
 #define OPERATIONS_H
 
-#include "matrix.h"
+#include <matrix/matrix.h>
 
 int check_dimentional_equality(Matrix* m1, Matrix* m2);
 Matrix* dot(Matrix* m1, Matrix* m2);
