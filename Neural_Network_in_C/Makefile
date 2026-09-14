@@ -1,11 +1,14 @@
 CC       = cc
 LIBDIR   = ../lib
 MATRIX   = $(LIBDIR)/matrix/libmatrix.a
-CFLAGS   = -O2 -Wall -Wextra -I$(LIBDIR)
+# -MMD -MP makes the compiler emit a .d file recording which headers each
+# source pulled in, so editing a header rebuilds everything that includes it.
+CFLAGS   = -O2 -Wall -Wextra -I$(LIBDIR) -MMD -MP
 LDLIBS   = -lm
 
 SRCS     = main.c neural_network/nn.c neural_network/activation.c mnist_ops/mnist.c
 OBJS     = $(SRCS:.c=.o)
+DEPS     = $(OBJS:.o=.d)
 TARGET   = nn
 
 all: $(TARGET)
@@ -21,10 +24,14 @@ $(MATRIX): $(wildcard $(LIBDIR)/matrix/*.c) $(wildcard $(LIBDIR)/matrix/*.h)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(DEPS) $(TARGET)
 
 # Also cleans the shared library.
 distclean: clean
 	$(MAKE) -C $(LIBDIR)/matrix clean
+
+# Pull in the generated header dependencies. The leading '-' means "don't
+# complain if they don't exist yet" (they won't, on a clean tree).
+-include $(DEPS)
 
 .PHONY: all clean distclean
