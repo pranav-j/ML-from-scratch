@@ -46,3 +46,9 @@ void corpus_free(Corpus* c) {
     free(c);   
 }
 
+Matrix* one_hot(int index, int vocab_size) {
+    Matrix* m = matrix_create(vocab_size, 1);
+    matrix_init(m, 0.0);
+    m->values[index] = 1;
+    return m;
+}

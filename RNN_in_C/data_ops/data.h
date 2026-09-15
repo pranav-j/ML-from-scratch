@@ -10,4 +10,4 @@ typedef struct {
 
 Corpus* corpus_load(const char* file_name);
 void corpus_free(Corpus* c);
-Matrix* one_hot(int index, int vocab_size); 
+Matrix* one_hot(int index, int vocab_size);
