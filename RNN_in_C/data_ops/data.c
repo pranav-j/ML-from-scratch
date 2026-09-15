@@ -39,3 +39,10 @@ Corpus* corpus_load(const char* file_name) {
 
     return c;
 }
+
+void corpus_free(Corpus* c) {
+    if(!c) return;
+    free(c->text);
+    free(c);   
+}
+
