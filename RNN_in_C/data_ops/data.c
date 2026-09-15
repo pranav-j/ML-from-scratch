@@ -7,7 +7,7 @@
 Corpus* corpus_load(const char* file_name) {
     FILE* f = fopen(file_name, "rb");
     if(!f) {
-        fprintf(stderr, "corpus_load: cannot open %s\n", filename);
+        fprintf(stderr, "corpus_load: cannot open %s\n", file_name);
         return NULL;
     }
 
@@ -18,7 +18,7 @@ Corpus* corpus_load(const char* file_name) {
     Corpus* c = malloc(sizeof(Corpus));
     c->text = malloc(size + 1);
     c->text_length = (int)fread(c->text, 1, size, f);
-    c->text[text_length + 1] = '\0';
+    c->text[c->text_length] = '\0';
     fclose(f);
 
     for(int i = 0; i <= 255; i++) {
@@ -49,6 +49,6 @@ void corpus_free(Corpus* c) {
 Matrix* one_hot(int index, int vocab_size) {
     Matrix* m = matrix_create(vocab_size, 1);
     matrix_init(m, 0.0);
-    m->values[index] = 1;
+    m->values[index][0] = 1.0;
     return m;
 }
