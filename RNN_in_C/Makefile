@@ -7,10 +7,10 @@ CFLAGS   = -O2 -Wall -Wextra -I$(LIBDIR) -MMD -MP
 LDLIBS   = -lm
 
 # Add new sources here as the RNN grows.
-SRCS     = main.c data_ops/data.c
+SRCS     = main.c data_ops/data.c rnn/rnn.c
 OBJS     = $(SRCS:.c=.o)
 DEPS     = $(OBJS:.o=.d)
-TARGET   = rnn
+TARGET   = rnn_
 
 all: $(TARGET)
 
