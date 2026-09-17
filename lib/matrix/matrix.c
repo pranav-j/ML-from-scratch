@@ -1,4 +1,5 @@
 #include <matrix/matrix.h>
+#include <matrix/operations.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

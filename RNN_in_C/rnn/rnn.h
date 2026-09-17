@@ -28,5 +28,6 @@ typedef struct {
 } RNNCache;
 
 Matrix* softmax(Matrix* matrix);
+void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t);
 
 #endif
