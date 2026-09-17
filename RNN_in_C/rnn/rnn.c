@@ -1,3 +1,4 @@
+#include "rnn.h"
 #include <matrix/matrix.h>
 #include <matrix/operations.h>
 #include "../data_ops/data.h"
@@ -48,3 +49,13 @@ void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t) {
     cache->p_cache[t] = y;
 }
 
+double rnn_forward(RNN* rnn, RNNCache* cache, int* chunk) { // int chunk[] -- same thing
+    double loss = 0.0;
+    for(int t = 0; t < T; t++) {
+        rnn_step(rnn, cache, chunk[t], t);
+        int target = chunk[t + 1];
+        double lil_loss = -log(cache->p_cache[t]->values[target][0]);
+        loss += lil_loss;
+    }
+    return loss;
+}
