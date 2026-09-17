@@ -11,6 +11,7 @@ typedef struct {
     Matrix* bh;
     Matrix* Why;
     Matrix* by;
+    int vocab_size;
 } RNN;
 
 typedef struct {
