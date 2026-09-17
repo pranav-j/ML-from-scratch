@@ -4,23 +4,19 @@
 #include "../data_ops/data.h"
 #include <math.h>
 
-Matrix* softmax(Matrix* matrix) {
-    double total = 0;
-    for(int i = 0; i < matrix->rows; i++) {
-        for(int j = 0; j < matrix->cols; j++) {
-            total += exp(matrix->values[i][j]);
-        }
+
+Matrix* softmax(Matrix* m) {
+    double max_val = m->values[0][0];
+    for (int i = 0; i < m->rows; i++)
+        if (m->values[i][0] > max_val) max_val = m->values[i][0];
+
+    double total = 0.0;
+    Matrix* out = matrix_create(m->rows, m->cols);
+    for (int i = 0; i < m->rows; i++) {
+        out->values[i][0] = exp(m->values[i][0] - max_val);
+        total += out->values[i][0];
     }
-
-    Matrix* out = matrix_create(matrix->rows, matrix->cols);
-    if(!out) return NULL;
-
-    for(int i = 0; i < matrix->rows; i++) {
-        for(int j = 0; j < matrix->cols; j++) {
-            out->values[i][j] = exp(matrix->values[i][j])/total;
-        }
-    }
-
+    for (int i = 0; i < m->rows; i++) out->values[i][0] /= total;
     return out;
 }
 
