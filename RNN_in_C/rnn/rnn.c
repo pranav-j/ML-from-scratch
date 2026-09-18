@@ -20,8 +20,41 @@ Matrix* softmax(Matrix* m) {
     return out;
 }
 
+RNN* rnn_create(int H, int V) {
+    RNN* rnn = malloc(sizeof(RNN));
+
+    rnn->H = H;
+    rnn->V = V;
+
+    rnn->Wxh = matrix_create(H, V);
+    rnn->Whh = matrix_create(H, H);
+    rnn->bh = matrix_create(H, 1);
+    rnn->Why = matrix_create(V, H);
+    rnn->by = matrix_create(V, 1);
+
+    matrix_randomize(rnn->Wxh, H);
+    matrix_randomize(rnn->Whh, H);
+    matrix_init(rnn->bh, 0.0);
+    matrix_randomize(rnn->Why, H);
+    matrix_init(rnn->by, 0.0);
+
+    return rnn;
+}
+
+void rnn_free(RNN* rnn) {
+    if (!rnn) return;
+    
+    matrix_free(rnn->Wxh);
+    matrix_free(rnn->Whh);
+    matrix_free(rnn->bh);
+    matrix_free(rnn->Why);
+    matrix_free(rnn->by);
+
+    free(rnn);
+}
+
 void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t) {
-    Matrix* input = one_hot(input_index, rnn->vocab_size);
+    Matrix* input = one_hot(input_index, rnn->V);
     cache->x_cache[t] = input;
 
     Matrix* xh = dot(rnn->Wxh, input);

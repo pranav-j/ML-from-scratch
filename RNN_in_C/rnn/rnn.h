@@ -6,12 +6,13 @@
 #define T 25
 
 typedef struct {
+    int V; // vocab_size
+    int H;
     Matrix* Wxh;
     Matrix* Whh;
     Matrix* bh;
     Matrix* Why;
     Matrix* by;
-    int vocab_size;
 } RNN;
 
 typedef struct {
@@ -27,6 +28,11 @@ typedef struct {
     Matrix* x_cache[T];
     Matrix* p_cache[T];
 } RNNCache;
+
+RNN* rnn_create(int H, int V);
+void rnn_free(RNN* rnn);
+
+
 
 Matrix* softmax(Matrix* matrix);
 void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t);
