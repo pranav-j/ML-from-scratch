@@ -86,6 +86,33 @@ void gradients_free(RNNGradients* grads) {
     free(grads);
 }
 
+RNNCache* cache_create(void) {
+    RNNCache* cache = malloc(sizeof(RNNCache));
+
+    for(int t = 0; t <= T; t++) cache->h_cache[t] = NULL;
+    for(int t = 0; t < T; t++) cache->x_cache[t] = NULL;
+    for(int t = 0; t < T; t++) cache->p_cache[t] = NULL;
+    
+    return cache;
+}
+
+void cache_reset(RNNCache* cache) {
+    for(int t = 0; t <= T; t++) {
+        if(cache->h_cache) {matrix_free(cache->h_cache[t]); cache->h_cache[t] = NULL;}
+    }
+
+    for(int t = 0; t < T; t++) {
+        if(cache->x_cache) {matrix_free(cache->x_cache[t]); cache->x_cache[t] = NULL;}
+        if(cache->p_cache) {matrix_free(cache->p_cache[t]); cache->p_cache[t] = NULL;}
+    }
+}
+
+void cache_free(RNNCache* cache) {
+    if(!cache) return;
+    cache_reset(cache);
+    free(cache);
+}
+
 void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t) {
     Matrix* input = one_hot(input_index, rnn->V);
     cache->x_cache[t] = input;

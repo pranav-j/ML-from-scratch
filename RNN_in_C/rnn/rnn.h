@@ -36,7 +36,9 @@ RNNGradients* gradients_create(int H, int V);
 void gradients_free(RNNGradients* grads);
 void gradients_zero(RNNGradients* grads);
 
-
+RNNCache* cache_create(void);
+void cache_free(RNNCache* cache);
+void cache_reset(RNNCache* cache);
 
 Matrix* softmax(Matrix* matrix);
 void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t);
