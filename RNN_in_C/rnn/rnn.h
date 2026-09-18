@@ -32,6 +32,10 @@ typedef struct {
 RNN* rnn_create(int H, int V);
 void rnn_free(RNN* rnn);
 
+RNNGradients* gradients_create(int H, int V);
+void gradients_free(RNNGradients* grads);
+void gradients_zero(RNNGradients* grads);
+
 
 
 Matrix* softmax(Matrix* matrix);

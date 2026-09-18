@@ -43,7 +43,7 @@ RNN* rnn_create(int H, int V) {
 
 void rnn_free(RNN* rnn) {
     if (!rnn) return;
-    
+
     matrix_free(rnn->Wxh);
     matrix_free(rnn->Whh);
     matrix_free(rnn->bh);
@@ -51,6 +51,39 @@ void rnn_free(RNN* rnn) {
     matrix_free(rnn->by);
 
     free(rnn);
+}
+
+RNNGradients* gradients_create(int H, int V) {
+    RNNGradients* grads = malloc(sizeof(RNNGradients));
+
+    grads->dWxh = matrix_create(H, V);
+    grads->dWhh = matrix_create(H, H);
+    grads->dbh = matrix_create(H, 1);
+    grads->dWhy = matrix_create(V, H);
+    grads->dby = matrix_create(V, 1);
+    gradients_zero(grads);
+
+    return grads;
+}
+
+void gradients_zero(RNNGradients* grads) {
+    matrix_init(grads->dWxh, 0.0);
+    matrix_init(grads->dWhh, 0.0);
+    matrix_init(grads->dbh, 0.0);
+    matrix_init(grads->dWhy, 0.0);
+    matrix_init(grads->dby, 0.0);
+}
+
+void gradients_free(RNNGradients* grads) {
+    if(!grads) return;
+
+    matrix_free(grads->dWxh);
+    matrix_free(grads->dWhh);
+    matrix_free(grads->dbh);
+    matrix_free(grads->dWhy);
+    matrix_free(grads->dby);
+
+    free(grads);
 }
 
 void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t) {
