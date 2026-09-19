@@ -14,6 +14,10 @@ TARGET   = rnn_
 
 all: $(TARGET)
 
+debug: CFLAGS += -O0 -g -fsanitize=address,undefined
+debug: LDLIBS += -fsanitize=address,undefined
+debug: clean $(TARGET)
+
 $(TARGET): $(OBJS) $(MATRIX)
 	$(CC) $(OBJS) $(MATRIX) $(LDLIBS) -o $@
 

@@ -3,6 +3,7 @@
 #include <matrix/operations.h>
 #include "../data_ops/data.h"
 #include <math.h>
+#include <stdlib.h>
 
 
 Matrix* softmax(Matrix* m) {
@@ -98,12 +99,12 @@ RNNCache* cache_create(void) {
 
 void cache_reset(RNNCache* cache) {
     for(int t = 0; t <= T; t++) {
-        if(cache->h_cache) {matrix_free(cache->h_cache[t]); cache->h_cache[t] = NULL;}
+        if(cache->h_cache[t]) {matrix_free(cache->h_cache[t]); cache->h_cache[t] = NULL;}
     }
 
     for(int t = 0; t < T; t++) {
-        if(cache->x_cache) {matrix_free(cache->x_cache[t]); cache->x_cache[t] = NULL;}
-        if(cache->p_cache) {matrix_free(cache->p_cache[t]); cache->p_cache[t] = NULL;}
+        if(cache->x_cache[t]) {matrix_free(cache->x_cache[t]); cache->x_cache[t] = NULL;}
+        if(cache->p_cache[t]) {matrix_free(cache->p_cache[t]); cache->p_cache[t] = NULL;}
     }
 }
 
