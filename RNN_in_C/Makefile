@@ -3,7 +3,7 @@ LIBDIR   = ../lib
 MATRIX   = $(LIBDIR)/matrix/libmatrix.a
 # -MMD -MP makes the compiler emit a .d file recording which headers each
 # source pulled in, so editing a header rebuilds everything that includes it.
-CFLAGS   = -O2 -Wall -Wextra -I$(LIBDIR) -MMD -MP
+CFLAGS = -O2 -Wall -Wextra -Werror -I$(LIBDIR) -MMD -MP
 LDLIBS   = -lm
 
 # Add new sources here as the RNN grows.
