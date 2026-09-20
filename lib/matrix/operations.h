@@ -13,5 +13,6 @@ Matrix* add_scalar(Matrix* matrix, double n);
 Matrix* transpose(Matrix* matrix);
 Matrix* apply(double (*func)(double), Matrix* matrix);
 void matrix_update(Matrix* matrix, Matrix* gradient, double learning_rate);
+void matrix_add_inplace(Matrix* dest, Matrix* src);
 
 #endif
