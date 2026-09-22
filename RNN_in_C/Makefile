@@ -3,40 +3,59 @@ LIBDIR   = ../lib
 MATRIX   = $(LIBDIR)/matrix/libmatrix.a
 # -MMD -MP makes the compiler emit a .d file recording which headers each
 # source pulled in, so editing a header rebuilds everything that includes it.
-CFLAGS = -O2 -Wall -Wextra -Werror -I$(LIBDIR) -MMD -MP
+CFLAGS   = -O2 -Wall -Wextra -Werror -I$(LIBDIR) -MMD -MP
 LDLIBS   = -lm
 
-# Add new sources here as the RNN grows.
-SRCS     = main.c data_ops/data.c rnn/rnn.c
-OBJS     = $(SRCS:.c=.o)
-DEPS     = $(OBJS:.o=.d)
-TARGET   = rnn_
+# --- Shared objects (used by both targets) ---
+SHARED_SRCS = data_ops/data.c rnn/rnn.c
+SHARED_OBJS = $(SHARED_SRCS:.c=.o)
+
+# --- Main training binary ---
+SRCS   = main.c $(SHARED_SRCS)
+OBJS   = $(SRCS:.c=.o)
+TARGET = rnn_
+
+# --- Gradient check binary ---
+GC_SRCS   = gradient_check.c $(SHARED_SRCS)
+GC_OBJS   = $(GC_SRCS:.c=.o)
+GC_TARGET = gradcheck
+
+DEPS = $(OBJS:.o=.d) $(GC_OBJS:.o=.d)
 
 all: $(TARGET)
-
-debug: CFLAGS += -O0 -g -fsanitize=address,undefined
-debug: LDLIBS += -fsanitize=address,undefined
-debug: clean $(TARGET)
 
 $(TARGET): $(OBJS) $(MATRIX)
 	$(CC) $(OBJS) $(MATRIX) $(LDLIBS) -o $@
 
-# Delegate to the shared library's own Makefile so it is always up to date.
+$(GC_TARGET): $(GC_OBJS) $(MATRIX)
+	$(CC) $(GC_OBJS) $(MATRIX) $(LDLIBS) -o $@
+
+# --- Debug builds ---
+# Convenience target: build training binary with sanitizers.
+debug: CFLAGS += -O0 -g -fsanitize=address,undefined
+debug: LDLIBS += -fsanitize=address,undefined
+debug: clean $(TARGET)
+
+# Convenience target: build gradcheck binary with sanitizers.
+# Named "gc-debug" (not "gradcheck") to avoid colliding with the binary rule above.
+gc-debug: CFLAGS += -O0 -g -fsanitize=address,undefined
+gc-debug: LDLIBS += -fsanitize=address,undefined
+gc-debug: clean $(GC_TARGET)
+
+# --- Library ---
 $(MATRIX): $(wildcard $(LIBDIR)/matrix/*.c) $(wildcard $(LIBDIR)/matrix/*.h)
 	$(MAKE) -C $(LIBDIR)/matrix
 
+# --- Compilation rule ---
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJS) $(DEPS) $(TARGET)
+	rm -f $(OBJS) $(GC_OBJS) $(DEPS) $(TARGET) $(GC_TARGET)
 
-# Also cleans the shared library.
 distclean: clean
 	$(MAKE) -C $(LIBDIR)/matrix clean
 
-# Pull in the generated header dependencies. The leading '-' means "don't
-# complain if they don't exist yet" (they won't, on a clean tree).
 -include $(DEPS)
 
-.PHONY: all clean distclean
+.PHONY: all clean distclean debug gc-debug
