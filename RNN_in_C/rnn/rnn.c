@@ -287,12 +287,13 @@ void rnn_sample(RNN* rnn, Corpus* corpus, char seed_char) {
         Matrix* p = softmax(z);
         current_index = sample_from(p);
         putchar(corpus->index_to_char[current_index]);
-        h = h_new;
+        
         matrix_free(x);
         matrix_free(a);
-        matrix_free(h_new);
+        matrix_free(h);
         matrix_free(z);
         matrix_free(p);
+        h = h_new;
     }
     putchar('\n');
 }
