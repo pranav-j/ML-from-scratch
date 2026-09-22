@@ -44,5 +44,7 @@ Matrix* softmax(Matrix* matrix);
 void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t);
 double rnn_forward(RNN* rnn, RNNCache* cache, int* chunk);
 void rnn_backward(RNN* rnn, RNNCache* cache, int* chunk, RNNGradients* grads);
+void gradients_clip(RNNGradients* grads, double max_norm);
+void rnn_update(RNN* rnn, RNNGradients* grads, double learning_rate);
 
 #endif

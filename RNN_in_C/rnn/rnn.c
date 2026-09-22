@@ -211,3 +211,44 @@ void rnn_backward(RNN* rnn, RNNCache* cache, int* chunk, RNNGradients* grads) {
     }
     matrix_free(dh_next);
 }
+
+void gradients_clip(RNNGradients* grads, double max_norm) {
+    for(int i = 0; i < grad->dWxh->rows; i++) {
+        for(int j = 0; j < grad->dWxh->cols; j++) {
+            double norm = square(grad->dWxh->values[i][j]);
+            if(norm > max_norm) {grad->dWxh->values[i][j] *= (max_norm/norm)};
+        }
+    }
+    for(int i = 0; i < grad->dWhh->rows; i++) {
+        for(int j = 0; j < grad->dWhh->cols; j++) {
+            double norm = square(grad->dWhh->values[i][j]);
+            if(norm > max_norm) {grad->dWhh->values[i][j] *= (max_norm/norm)};
+        }
+    }
+    for(int i = 0; i < grad->dbh->rows; i++) {
+        for(int j = 0; j < grad->dbh->cols; j++) {
+            double norm = square(dbh->Wxh->values[i][j]);
+            if(norm > max_norm) {grad->dbh->values[i][j] *= (max_norm/norm)};
+        }
+    }
+    for(int i = 0; i < grad->dWhy->rows; i++) {
+        for(int j = 0; j < grad->dWhy->cols; j++) {
+            double norm = square(grad->dWhy->values[i][j]);
+            if(norm > max_norm) {grad->dWhy->values[i][j] *= (max_norm/norm)};
+        }
+    }
+    for(int i = 0; i < grad->dby->rows; i++) {
+        for(int j = 0; j < grad->dby->cols; j++) {
+            double norm = square(grad->dby->values[i][j]);
+            if(norm > max_norm) {grad->dby->values[i][j] *= (max_norm/norm)};
+        }
+    }
+}
+
+void rnn_update(RNN* rnn, RNNGradients* grads, double learning_rate) {
+    matrix_update(rnn->Wxh, grads->dWxh, learning_rate);
+    matrix_update(rnn->Whh, grads->dWhh, learning_rate);
+    matrix_update(rnn->bh, grads->dbh, learning_rate);
+    matrix_update(rnn->Why, grads->dWhy, learning_rate);
+    matrix_update(rnn->by, grads->dby, learning_rate);
+}
