@@ -2,6 +2,7 @@
 #define RNN_H
 
 #include <matrix/matrix.h>
+#include "../data_ops/data.h"
 
 #define T 25
 
@@ -46,5 +47,6 @@ double rnn_forward(RNN* rnn, RNNCache* cache, int* chunk);
 void rnn_backward(RNN* rnn, RNNCache* cache, int* chunk, RNNGradients* grads);
 void gradients_clip(RNNGradients* grads, double max_norm);
 void rnn_update(RNN* rnn, RNNGradients* grads, double learning_rate);
+void rnn_sample(RNN* rnn, Corpus* corpus, char seed_char);
 
 #endif

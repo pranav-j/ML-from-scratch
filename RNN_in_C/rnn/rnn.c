@@ -1,9 +1,9 @@
 #include "rnn.h"
 #include <matrix/matrix.h>
 #include <matrix/operations.h>
-#include "../data_ops/data.h"
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 static double square(double x) { return x * x; }
 
@@ -251,7 +251,38 @@ void rnn_update(RNN* rnn, RNNGradients* grads, double learning_rate) {
     matrix_update(rnn->by, grads->dby, learning_rate);
 }
 
-void rnn_sample(RNN* rnn, int input_index) {
-    Matrix* input = one_hot(input_index, rnn->V);
-    
+void rnn_sample(RNN* rnn, Corpus* corpus, char seed_char) {
+    int current_index = corpus->char_to_index[seed_char];
+    Matrix* h = matrix_create(rnn->H, 1);
+    matrix_init(h, 0.0);
+    putchar(corpus->index_to_char[current_index]);
+
+    for( int i = 0; i < 100; i++) {
+        Matrix* x = one_hot(index, rnn->V);
+
+        Matrix* Wxh_dot_x = dot(rnn->Wxh, x);
+        Matrix* Whh_dot_h = dot(rnn->Whh, h);
+        Matrix* Wxh_dot_x_PLUS_Whh_dot_h = add(Wxh_dot_x + Whh_dot_h);
+        Matrix* a = add(Wxh_dot_x_PLUS_Whh_dot_h, rnn->bh);
+
+        matrix_free(Wxh_dot_x);
+        matrix_free(Whh_dot_h);
+        matrix_free(Wxh_dot_x_PLUS_Whh_dot_h);
+
+        Matrix* h_new = apply(tanh, a);
+
+        Matrix* Why_dot_h_new = dot(rnn->Why, h_new);
+        Matrix* z = add(Why_dot_h_new, rnn->hy);
+        matrix_free(Why_dot_h_new)
+        Matrix* p = softmax(z);
+        current_index = p;
+        putchar(corpus->index_to_char[p]);
+        h = h_new;
+        matrix_free(x);
+        matrix_free(a);
+        matrix_free(h_new);
+        matrix_free(z);
+        matrix_free(p);
+    }
+    putchar('\n');
 }

@@ -66,6 +66,9 @@ int main(void) {
 
         gradients_free(grads);
         cache_free(cache);
+
+
+        rnn_sample(rnn, c, 'a');
     }
     corpus_free(c);
     return 0;
