@@ -251,18 +251,28 @@ void rnn_update(RNN* rnn, RNNGradients* grads, double learning_rate) {
     matrix_update(rnn->by, grads->dby, learning_rate);
 }
 
+static int sample_from(Matrix* p) {
+    double r = (double)rand() / ((double)RAND_MAX + 1.0);
+    double cumulative = 0.0;
+    for (int k = 0; k < p->rows; k++) {
+        cumulative += p->values[k][0];
+        if (r < cumulative) return k;
+    }
+    return p->rows - 1;  // floating-point roundoff guard
+}
+
 void rnn_sample(RNN* rnn, Corpus* corpus, char seed_char) {
-    int current_index = corpus->char_to_index[seed_char];
+    int current_index = corpus->char_to_index[(unsigned char)seed_char];
     Matrix* h = matrix_create(rnn->H, 1);
     matrix_init(h, 0.0);
     putchar(corpus->index_to_char[current_index]);
 
     for( int i = 0; i < 100; i++) {
-        Matrix* x = one_hot(index, rnn->V);
+        Matrix* x = one_hot(current_index, rnn->V);
 
         Matrix* Wxh_dot_x = dot(rnn->Wxh, x);
         Matrix* Whh_dot_h = dot(rnn->Whh, h);
-        Matrix* Wxh_dot_x_PLUS_Whh_dot_h = add(Wxh_dot_x + Whh_dot_h);
+        Matrix* Wxh_dot_x_PLUS_Whh_dot_h = add(Wxh_dot_x, Whh_dot_h);
         Matrix* a = add(Wxh_dot_x_PLUS_Whh_dot_h, rnn->bh);
 
         matrix_free(Wxh_dot_x);
@@ -272,11 +282,11 @@ void rnn_sample(RNN* rnn, Corpus* corpus, char seed_char) {
         Matrix* h_new = apply(tanh, a);
 
         Matrix* Why_dot_h_new = dot(rnn->Why, h_new);
-        Matrix* z = add(Why_dot_h_new, rnn->hy);
-        matrix_free(Why_dot_h_new)
+        Matrix* z = add(Why_dot_h_new, rnn->by);
+        matrix_free(Why_dot_h_new);
         Matrix* p = softmax(z);
-        current_index = p;
-        putchar(corpus->index_to_char[p]);
+        current_index = sample_from(p);
+        putchar(corpus->index_to_char[current_index]);
         h = h_new;
         matrix_free(x);
         matrix_free(a);
