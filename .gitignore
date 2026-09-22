@@ -10,4 +10,5 @@
 # Binaries
 /Neural_Network_in_C/nn
 /RNN_in_C/rnn_
+/RNN_in_C/gradcheck
 /Linear_Regression_in_C/linear_regression
