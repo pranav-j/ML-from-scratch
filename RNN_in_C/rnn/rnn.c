@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdlib.h>
 
+static double square(double x) { return x * x; }
 
 Matrix* softmax(Matrix* m) {
     double max_val = m->values[0][0];
@@ -148,4 +149,65 @@ double rnn_forward(RNN* rnn, RNNCache* cache, int* chunk) { // int chunk[] -- sa
         loss += lil_loss;
     }
     return loss;
+}
+
+void rnn_backward(RNN* rnn, RNNCache* cache, int* chunk, RNNGradients* grads) {
+    Matrix* dh_next = matrix_create(rnn->H, 1);
+    matrix_init(dh_next, 0.0);
+
+    for(int t = T - 1; t >= 0; t--) {
+        Matrix* y_t = one_hot(chunk[t + 1], rnn->V);
+        Matrix* dzt = subtract(cache->p_cache[t], y_t);
+        matrix_free(y_t);
+
+        Matrix* WhyT = transpose(rnn->Why);
+        Matrix* WhyT_dot_dzt = dot(WhyT, dzt);
+        Matrix* dh_t = add(WhyT_dot_dzt, dh_next);
+        matrix_free(WhyT);
+        matrix_free(WhyT_dot_dzt);
+
+        Matrix* ones = matrix_create(rnn->H, 1);
+        matrix_init(ones, 1.0);
+        Matrix* h_cache_square = apply(square, cache->h_cache[t + 1]);
+        Matrix* sub_ones_h_cache_square = subtract(ones, h_cache_square);
+        Matrix* da_t = hadamard(dh_t, sub_ones_h_cache_square);
+        matrix_free(ones);
+        matrix_free(h_cache_square);
+        matrix_free(sub_ones_h_cache_square);
+
+
+        //Gradinet updates
+        Matrix* h_cache_next_T = transpose(cache->h_cache[t+1]);
+        Matrix* dzt_dot_h_cache_next_T = dot(dzt, h_cache_next_T);
+        matrix_add_inplace(grads->dWhy, dzt_dot_h_cache_next_T);
+        matrix_free(h_cache_next_T);
+        matrix_free(dzt_dot_h_cache_next_T);
+
+        matrix_add_inplace(grads->dby, dzt);
+
+        Matrix* x_cacheT = transpose(cache->x_cache[t]);
+        Matrix* da_t_dot_x_cacheT = dot(da_t, x_cacheT);
+        matrix_add_inplace(grads->dWxh, da_t_dot_x_cacheT);
+        matrix_free(x_cacheT);
+        matrix_free(da_t_dot_x_cacheT);
+
+        Matrix* h_cache_prev_T = transpose(cache->h_cache[t]);
+        Matrix* da_t_dot_h_cache_prev_T = dot(da_t, h_cache_prev_T);
+        matrix_add_inplace(grads->dWhh, da_t_dot_h_cache_prev_T);
+        matrix_free(h_cache_prev_T);
+        matrix_free(da_t_dot_h_cache_prev_T);
+
+        matrix_add_inplace(grads->dbh, da_t);
+
+        Matrix* WhhT = transpose(rnn->Whh);
+        Matrix* new_dh_next = dot(WhhT, da_t);
+        matrix_free(WhhT);
+        matrix_free(dh_next);
+        dh_next = new_dh_next;
+
+        matrix_free(dzt);
+        matrix_free(dh_t);
+        matrix_free(da_t);
+    }
+    matrix_free(dh_next);
 }

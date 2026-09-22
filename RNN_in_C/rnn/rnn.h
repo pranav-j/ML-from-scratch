@@ -43,5 +43,6 @@ void cache_reset(RNNCache* cache);
 Matrix* softmax(Matrix* matrix);
 void rnn_step(RNN* rnn, RNNCache* cache, int input_index, int t);
 double rnn_forward(RNN* rnn, RNNCache* cache, int* chunk);
+void rnn_backward(RNN* rnn, RNNCache* cache, int* chunk, RNNGradients* grads);
 
 #endif
