@@ -44,8 +44,9 @@ int main(void) {
             }
             double loss = rnn_forward(rnn, cache, chunk);
 
-            if(chunk_num == num_chunks - 1) {
-                printf("EPOCHS: %d, Chunk %d loss: %f \n", epoch, chunk_num, loss);
+            if (chunk_num % 50 == 0) {
+                printf("Epoch %d, Chunk %d/%d, loss: %f\n",
+                    epoch, chunk_num, num_chunks, loss);
             }
             
 
@@ -54,7 +55,7 @@ int main(void) {
             rnn_backward(rnn, cache, chunk, grads);
 
             // Updation
-            gradients_clip(grads, max_norm)
+            gradients_clip(grads, max_norm);
             rnn_update(rnn, grads, LR);
             
 

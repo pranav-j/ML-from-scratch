@@ -250,3 +250,8 @@ void rnn_update(RNN* rnn, RNNGradients* grads, double learning_rate) {
     matrix_update(rnn->Why, grads->dWhy, learning_rate);
     matrix_update(rnn->by, grads->dby, learning_rate);
 }
+
+void rnn_sample(RNN* rnn, int input_index) {
+    Matrix* input = one_hot(input_index, rnn->V);
+    
+}
