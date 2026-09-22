@@ -212,37 +212,35 @@ void rnn_backward(RNN* rnn, RNNCache* cache, int* chunk, RNNGradients* grads) {
     matrix_free(dh_next);
 }
 
+static double matrix_l2_norm(Matrix* m) {
+    double sum = 0.0;
+    for(int i = 0; i < m->rows; i++) {
+        for(int j = 0; j < m->cols; j++) {
+            sum += m->values[i][j];
+        }
+    }
+    return sqrt(sum);
+}
+
+static void clip_one(Matrix* m, double max_norm) {
+    double norm = matrix_l2_norm(m);
+    if(norm > max_norm) {
+        double factor = max_norm/norm;
+        for(int i = 0; i < m->rows; i++) {
+            for(int j = 0; j < m->cols; j++) {
+                m->values[i][j] *= factor;
+            }
+        }
+    }
+
+}
+
 void gradients_clip(RNNGradients* grads, double max_norm) {
-    for(int i = 0; i < grad->dWxh->rows; i++) {
-        for(int j = 0; j < grad->dWxh->cols; j++) {
-            double norm = square(grad->dWxh->values[i][j]);
-            if(norm > max_norm) {grad->dWxh->values[i][j] *= (max_norm/norm)};
-        }
-    }
-    for(int i = 0; i < grad->dWhh->rows; i++) {
-        for(int j = 0; j < grad->dWhh->cols; j++) {
-            double norm = square(grad->dWhh->values[i][j]);
-            if(norm > max_norm) {grad->dWhh->values[i][j] *= (max_norm/norm)};
-        }
-    }
-    for(int i = 0; i < grad->dbh->rows; i++) {
-        for(int j = 0; j < grad->dbh->cols; j++) {
-            double norm = square(dbh->Wxh->values[i][j]);
-            if(norm > max_norm) {grad->dbh->values[i][j] *= (max_norm/norm)};
-        }
-    }
-    for(int i = 0; i < grad->dWhy->rows; i++) {
-        for(int j = 0; j < grad->dWhy->cols; j++) {
-            double norm = square(grad->dWhy->values[i][j]);
-            if(norm > max_norm) {grad->dWhy->values[i][j] *= (max_norm/norm)};
-        }
-    }
-    for(int i = 0; i < grad->dby->rows; i++) {
-        for(int j = 0; j < grad->dby->cols; j++) {
-            double norm = square(grad->dby->values[i][j]);
-            if(norm > max_norm) {grad->dby->values[i][j] *= (max_norm/norm)};
-        }
-    }
+    clip_one(grads->dWxh, max_norm);
+    clip_one(grads->dWhh, max_norm);
+    clip_one(grads->dbh, max_norm);
+    clip_one(grads->dWhy, max_norm);
+    clip_one(grads->dby, max_norm);
 }
 
 void rnn_update(RNN* rnn, RNNGradients* grads, double learning_rate) {
