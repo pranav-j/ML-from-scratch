@@ -148,15 +148,14 @@ void matrix_update(Matrix* matrix, Matrix* gradient, double learning_rate) {
 }
 
 void matrix_add_inplace(Matrix* dest, Matrix* src) {
-    if(!check_dimentional_equality(dest, src)) {
-        fprintf(stderr, "matrix add: shape mismatch (%dx%d + %dx%d)\n",
+    if (!check_dimentional_equality(dest, src)) {
+        fprintf(stderr, "matrix_add_inplace: dimension mismatch (%dx%d vs %dx%d)\n",
                 dest->rows, dest->cols, src->rows, src->cols);
         return;
     }
-
-    for(int i = 0; i < dest->rows; i++) {
-        for(int j = 0; j < dest->cols; j++) {
-            dest->values[i][j] =+ src->values[i][j];
+    for (int i = 0; i < dest->rows; i++) {
+        for (int j = 0; j < dest->cols; j++) {
+            dest->values[i][j] += src->values[i][j];
         }
     }
 }

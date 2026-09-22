@@ -25,6 +25,7 @@ int main(void) {
         cache->h_cache[0] = matrix_create(H, 1);
         matrix_init(cache->h_cache[0], 0.0);
 
+        // Forward
 
         for(int i = 0; i < T + 1; i++) {
             unsigned char ch = (unsigned char) c->text[chunk_num*T + i];
@@ -32,7 +33,15 @@ int main(void) {
         }
         double loss = rnn_forward(rnn, cache, chunk);
         printf("Chunk %d loss: %f \n", chunk_num, loss);
+
+        // Backward
+
+        RNNGradients* grads = gradients_create(H, rnn->V);
+        rnn_backward(rnn, cache, chunk, grads);
+
+        gradients_free(grads);
         cache_free(cache);
+
     }
 
 
