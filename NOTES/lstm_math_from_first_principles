@@ -1,0 +1,5149 @@
+# LSTM Mathematics From First Principles
+
+## A textbook-style derivation from forward pass to scalar backpropagation
+
+---
+
+# 0. What We Are Going to Derive
+
+The goal is not merely to understand what an LSTM does.
+
+The goal is to derive **every quantity needed to implement an LSTM and its backpropagation from scratch in C**.
+
+We will proceed in this order:
+
+1. Start with the problem an ordinary RNN has.
+2. Define the LSTM forward pass.
+3. Understand every intermediate quantity and why it exists.
+4. Derive the loss gradient.
+5. Backpropagate through the output.
+6. Backpropagate through the LSTM gates.
+7. Backpropagate through the cell state.
+8. Backpropagate through the concatenated input.
+9. Derive gradients with respect to:
+
+   * weights,
+   * biases,
+   * hidden states,
+   * cell states,
+   * inputs.
+10. Expand the matrix equations down to scalar derivatives.
+11. Connect everything into one dependency chain.
+12. Explain truncated BPTT across multiple time steps.
+13. Finish with a C-oriented implementation blueprint.
+
+The central idea throughout this chapter is:
+
+> **To compute a gradient, follow the dependency chain backward.**
+
+---
+
+# 1. Why Do We Need an LSTM?
+
+Consider a sequence
+
+$$
+x_1,x_2,\ldots,x_T
+$$
+
+An ordinary RNN maintains a hidden state
+
+$$
+h_t
+$$
+
+that summarizes previous information.
+
+A simple RNN is
+
+$$
+a_t=W_{xh}x_t+W_{hh}h_{t-1}+b_h
+\tag{1}
+$$
+
+followed by
+
+$$
+h_t=\tanh(a_t)
+\tag{2}
+$$
+
+and perhaps an output
+
+$$
+o_t=W_{hy}h_t+b_y
+\tag{3}
+$$
+
+with
+
+$$
+\hat y_t=\operatorname{softmax}(o_t).
+\tag{4}
+$$
+
+The problem is that information must repeatedly pass through the nonlinear transformation
+
+$$
+h_t=\tanh(a_t).
+$$
+
+During backpropagation, this creates repeated multiplication by derivatives such as
+
+$$
+\tanh'(a_t)=1-\tanh^2(a_t).
+\tag{5}
+$$
+
+Because
+
+$$
+0 < 1-\tanh^2(a_t) \leq 1,
+$$
+
+repeated multiplication can make gradients become extremely small.
+
+This is the **vanishing-gradient problem**.
+
+The LSTM introduces a second state:
+
+$$
+c_t
+$$
+
+called the **cell state**.
+
+The key difference is that the cell state has a deliberately controlled path through time.
+
+---
+
+# 2. The Two States of an LSTM
+
+At time \(t\), an LSTM has:
+
+## Hidden state
+
+$$
+h_t
+$$
+
+This is the state exposed to the rest of the network.
+
+## Cell state
+
+$$
+c_t
+$$
+
+This acts as the LSTM's longer-term memory.
+
+So instead of
+
+$$
+h_{t-1}\rightarrow h_t,
+$$
+
+we have
+
+$$
+(h_{t-1},c_{t-1})
+\rightarrow
+(h_t,c_t).
+$$
+
+The cell state is the crucial addition.
+
+---
+
+# 3. Inputs and Dimensions
+
+Suppose:
+
+* input dimension = \(D\)
+* hidden dimension = \(H\)
+
+At time \(t\),
+
+$$
+x_t\in\mathbb R^D
+$$
+
+$$
+h_{t-1}\in\mathbb R^H
+$$
+
+$$
+c_{t-1}\in\mathbb R^H.
+$$
+
+We concatenate the input and previous hidden state:
+
+$$
+z_t=
+\begin{bmatrix}
+h_{t-1}\\
+x_t
+\end{bmatrix}.
+\tag{6}
+$$
+
+Therefore
+
+$$
+z_t\in\mathbb R^{H+D}.
+$$
+
+We will use this concatenated vector heavily because it allows all four LSTM transformations to be expressed using one matrix multiplication.
+
+---
+
+# 4. The Four Things an LSTM Computes
+
+An LSTM computes four vectors at every time step:
+
+1. Forget gate
+2. Input gate
+3. Candidate cell state
+4. Output gate
+
+We denote them
+
+$$
+f_t
+$$
+
+$$
+i_t
+$$
+
+$$
+g_t
+$$
+
+$$
+o_t.
+$$
+
+Some textbooks call \(g_t\) the candidate state, candidate memory, or \(\tilde c_t\).
+
+We will use
+
+$$
+g_t
+$$
+
+to avoid confusing it with the actual cell state \(c_t\).
+
+---
+
+# 5. The Master LSTM Equation
+
+The four gates can be calculated simultaneously.
+
+Define
+
+$$
+a_t
+=
+Wz_t+b.
+\tag{7}
+$$
+
+Here
+
+$$
+W\in\mathbb R^{4H\times(H+D)}
+$$
+
+and
+
+$$
+b\in\mathbb R^{4H}.
+$$
+
+Split \(a_t\) into four \(H\)-dimensional pieces:
+
+$$
+a_t=
+\begin{bmatrix}
+a_t^f\\
+a_t^i\\
+a_t^g\\
+a_t^o
+\end{bmatrix}.
+\tag{8}
+$$
+
+Then:
+
+$$
+f_t=\sigma(a_t^f)
+\tag{9}
+$$
+
+$$
+i_t=\sigma(a_t^i)
+\tag{10}
+$$
+
+$$
+g_t=\tanh(a_t^g)
+\tag{11}
+$$
+
+$$
+o_t=\sigma(a_t^o).
+\tag{12}
+$$
+
+These four quantities determine the new memory.
+
+---
+
+# 6. Why Four Gates?
+
+Each gate answers a different question.
+
+## Forget gate
+
+$$
+f_t
+$$
+
+asks:
+
+> How much of the previous memory should survive?
+
+---
+
+## Input gate
+
+$$
+i_t
+$$
+
+asks:
+
+> How much new information should be written into memory?
+
+---
+
+## Candidate
+
+$$
+g_t
+$$
+
+asks:
+
+> What new information could we write?
+
+---
+
+## Output gate
+
+$$
+o_t
+$$
+
+asks:
+
+> How much of the current memory should be exposed as the hidden state?
+
+---
+
+# 7. Cell State Update
+
+The new cell state is
+
+$$
+c_t
+=
+f_t\odot c_{t-1}
++
+i_t\odot g_t.
+\tag{13}
+$$
+
+Here
+
+$$
+\odot
+$$
+
+means element-wise multiplication.
+
+This equation is the heart of the LSTM.
+
+It contains two paths:
+
+$$
+c_{t-1}
+\rightarrow
+f_t\odot c_{t-1}
+$$
+
+and
+
+$$
+g_t
+\rightarrow
+i_t\odot g_t.
+$$
+
+Therefore:
+
+$$
+\boxed{
+c_t
+=
+\text{old memory kept}
++
+\text{new memory written}
+}
+$$
+
+---
+
+# 8. Hidden State Update
+
+Once \(c_t\) is known, compute
+
+$$
+h_t
+=
+o_t\odot\tanh(c_t).
+\tag{14}
+$$
+
+This is another important distinction.
+
+The cell state is the memory.
+
+The hidden state is the exposed version of that memory.
+
+---
+
+# 9. Complete Forward Dependency Chain
+
+Everything at one time step is therefore:
+
+$$
+(h_{t-1},x_t)
+\rightarrow z_t
+\rightarrow a_t
+\rightarrow
+(f_t,i_t,g_t,o_t)
+$$
+
+then
+
+$$
+(f_t,c_{t-1},i_t,g_t)
+\rightarrow c_t
+$$
+
+then
+
+$$
+(o_t,c_t)
+\rightarrow h_t.
+$$
+
+Written as one chain:
+
+$$
+\boxed{
+(h_{t-1},x_t)
+\rightarrow
+z_t
+\rightarrow
+a_t
+\rightarrow
+\{f_t,i_t,g_t,o_t\}
+\rightarrow
+c_t
+\rightarrow
+h_t
+}
+\tag{15}
+$$
+
+This chain is extremely important because backpropagation simply follows this chain in reverse.
+
+---
+
+# 10. Why We Need to Understand the Dependency Graph
+
+Suppose the loss is
+
+$$
+L.
+$$
+
+We want
+
+$$
+\frac{\partial L}{\partial W}.
+$$
+
+But \(W\) does not directly affect \(L\).
+
+The actual chain is
+
+$$
+W
+\rightarrow
+a_t
+\rightarrow
+f_t,i_t,g_t,o_t
+\rightarrow
+c_t
+\rightarrow
+h_t
+\rightarrow
+L.
+$$
+
+Therefore we cannot jump directly to
+
+$$
+\frac{\partial L}{\partial W}.
+$$
+
+We must apply the chain rule through every intermediate quantity.
+
+This is the same principle used in the ordinary neural-network derivation.
+
+---
+
+# 11. Activation Functions
+
+We need two activation functions.
+
+## 11.1 Sigmoid
+
+$$
+\sigma(x)
+=
+\frac{1}{1+e^{-x}}.
+\tag{16}
+$$
+
+Its derivative is
+
+$$
+\sigma'(x)
+=
+\sigma(x)(1-\sigma(x)).
+\tag{17}
+$$
+
+Therefore, if
+
+$$
+y=\sigma(x),
+$$
+
+then
+
+$$
+\frac{\partial y}{\partial x}
+=
+y(1-y).
+\tag{18}
+$$
+
+This is convenient in implementation because once we have \(y\), we do not need to recompute the sigmoid.
+
+---
+
+# 12. Tanh
+
+$$
+\tanh(x)
+=
+\frac{e^x-e^{-x}}{e^x+e^{-x}}.
+\tag{19}
+$$
+
+Its derivative is
+
+$$
+\frac{d}{dx}\tanh(x)
+=
+1-\tanh^2(x).
+\tag{20}
+$$
+
+Therefore if
+
+$$
+y=\tanh(x),
+$$
+
+then
+
+$$
+\frac{\partial y}{\partial x}
+=
+1-y^2.
+\tag{21}
+$$
+
+Again, the output \(y\) is enough to calculate the derivative.
+
+---
+
+# 13. Scalar Version of the LSTM
+
+Before doing vector calculus, consider a single hidden unit.
+
+Drop the time index temporarily.
+
+We have:
+
+$$
+z_j
+$$
+
+for each input to the LSTM.
+
+For one memory unit:
+
+$$
+a_f=\sum_j W^f_jz_j+b_f
+\tag{22}
+$$
+
+$$
+f=\sigma(a_f)
+\tag{23}
+$$
+
+$$
+a_i=\sum_j W^i_jz_j+b_i
+\tag{24}
+$$
+
+$$
+i=\sigma(a_i)
+\tag{25}
+$$
+
+$$
+a_g=\sum_j W^g_jz_j+b_g
+\tag{26}
+$$
+
+$$
+g=\tanh(a_g)
+\tag{27}
+$$
+
+$$
+a_o=\sum_j W^o_jz_j+b_o
+\tag{28}
+$$
+
+$$
+o=\sigma(a_o).
+\tag{29}
+$$
+
+Then:
+
+$$
+c=fc_{\text{old}}+ig
+\tag{30}
+$$
+
+and
+
+$$
+h=o\tanh(c).
+\tag{31}
+$$
+
+This scalar form is extremely useful when deriving derivatives.
+
+---
+
+# 14. The Backpropagation Problem
+
+Suppose the loss depends on the hidden state:
+
+$$
+L=L(h_t).
+$$
+
+Then we initially know
+
+$$
+\frac{\partial L}{\partial h_t}.
+$$
+
+We want to eventually calculate:
+
+$$
+\frac{\partial L}{\partial W}
+$$
+
+and
+
+$$
+\frac{\partial L}{\partial b}.
+$$
+
+We also need:
+
+$$
+\frac{\partial L}{\partial h_{t-1}}
+$$
+
+and
+
+$$
+\frac{\partial L}{\partial c_{t-1}}
+$$
+
+because those gradients must propagate to the previous time step.
+
+---
+
+# 15. The Central Backpropagation Principle
+
+At every intermediate variable \(q\), ask:
+
+> What is the gradient of the loss with respect to \(q\)?
+
+We will use the notation
+
+$$
+\bar q
+\equiv
+\frac{\partial L}{\partial q}.
+$$
+
+For example:
+
+$$
+\bar h_t
+=
+\frac{\partial L}{\partial h_t}.
+$$
+
+This notation makes the derivation much easier to follow.
+
+---
+
+# 16. First Backward Step: From \(h_t\) to \(o_t\)
+
+We have
+
+$$
+h_t=o_t\odot\tanh(c_t).
+$$
+
+For one scalar component:
+
+$$
+h=o\tanh(c).
+$$
+
+We want
+
+$$
+\frac{\partial L}{\partial o}.
+$$
+
+By the chain rule:
+
+$$
+\frac{\partial L}{\partial o}
+=
+\frac{\partial L}{\partial h}
+\frac{\partial h}{\partial o}.
+\tag{32}
+$$
+
+Since
+
+$$
+h=o\tanh(c),
+$$
+
+we have
+
+$$
+\frac{\partial h}{\partial o}
+=
+\tanh(c).
+\tag{33}
+$$
+
+Therefore:
+
+$$
+\boxed{
+\frac{\partial L}{\partial o}
+=
+\bar h\tanh(c)
+}
+\tag{34}
+$$
+
+Vector form:
+
+$$
+\boxed{
+\bar o_t
+=
+\bar h_t\odot\tanh(c_t)
+}
+\tag{35}
+$$
+
+---
+
+# 17. Backpropagating From \(h_t\) to \(c_t\)
+
+Again,
+
+$$
+h=o\tanh(c).
+$$
+
+Therefore
+
+$$
+\frac{\partial h}{\partial c}
+=
+o\tanh'(c).
+$$
+
+Using
+
+$$
+\tanh'(c)=1-\tanh^2(c),
+$$
+
+we obtain
+
+$$
+\frac{\partial h}{\partial c}
+=
+o(1-\tanh^2(c)).
+\tag{36}
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar c_t^{(h)}
+=
+\bar h_t
+\odot
+o_t
+\odot
+(1-\tanh^2(c_t))
+}
+\tag{37}
+$$
+
+The superscript indicates that this gradient came from the hidden-state path.
+
+But there is an important complication.
+
+---
+
+# 18. The Cell State Has Multiple Gradient Paths
+
+The cell state \(c_t\) may receive gradient from:
+
+1. the current hidden state \(h_t\),
+2. the next time step \(c_{t+1}\).
+
+Therefore the total cell-state gradient is
+
+$$
+\boxed{
+\bar c_t
+=
+\bar c_t^{(h)}
++
+\bar c_t^{(\text{future})}
+}
+\tag{38}
+$$
+
+This is one of the most important concepts in LSTM backpropagation.
+
+Gradients are **summed when paths merge**.
+
+---
+
+# 19. Why Does the Cell State Help With Vanishing Gradients?
+
+The cell update is
+
+$$
+c_t=f_t c_{t-1}+i_tg_t.
+$$
+
+Ignoring the second term for a moment:
+
+$$
+c_t\approx f_tc_{t-1}.
+$$
+
+Therefore:
+
+$$
+\frac{\partial c_t}{\partial c_{t-1}}
+\approx f_t.
+$$
+
+If the forget gate learns values close to \(1\), then
+
+$$
+\frac{\partial c_t}{\partial c_{t-1}}
+\approx 1.
+$$
+
+So the gradient can travel across many time steps without necessarily being multiplied by a small nonlinear derivative at every step.
+
+This is the mathematical reason the LSTM's cell state provides a much better long-term gradient pathway.
+
+---
+
+# 20. Backpropagation Through the Cell Update
+
+We have:
+
+$$
+c_t=f_tc_{t-1}+i_tg_t.
+$$
+
+We now have
+
+$$
+\bar c_t
+=
+\frac{\partial L}{\partial c_t}.
+$$
+
+We need gradients with respect to:
+
+$$
+f_t,
+\quad
+c_{t-1},
+\quad
+i_t,
+\quad
+g_t.
+$$
+
+---
+
+# 21. Gradient With Respect to the Forget Gate
+
+Consider
+
+$$
+c=fc_{\text{old}}+ig.
+$$
+
+Then
+
+$$
+\frac{\partial c}{\partial f}
+=
+c_{\text{old}}.
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar f_t
+=
+\bar c_t\odot c_{t-1}
+}
+\tag{39}
+$$
+
+---
+
+# 22. Gradient With Respect to Previous Cell State
+
+Since
+
+$$
+c_t=f_tc_{t-1}+i_tg_t,
+$$
+
+we have
+
+$$
+\frac{\partial c_t}{\partial c_{t-1}}
+=
+f_t.
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar c_{t-1}
+=
+\bar c_t\odot f_t
+}
+\tag{40}
+$$
+
+This is the fundamental LSTM memory-gradient equation.
+
+---
+
+# 23. Gradient With Respect to Input Gate
+
+Since
+
+$$
+c=fc_{\text{old}}+ig,
+$$
+
+we have
+
+$$
+\frac{\partial c}{\partial i}
+=
+g.
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar i_t
+=
+\bar c_t\odot g_t
+}
+\tag{41}
+$$
+
+---
+
+# 24. Gradient With Respect to Candidate
+
+Similarly:
+
+$$
+\frac{\partial c}{\partial g}
+=
+i.
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar g_t
+=
+\bar c_t\odot i_t
+}
+\tag{42}
+$$
+
+---
+
+# 25. Summary So Far
+
+From
+
+$$
+h_t=o_t\odot\tanh(c_t)
+$$
+
+we obtained:
+
+$$
+\boxed{
+\bar o_t
+=
+\bar h_t\odot\tanh(c_t)
+}
+$$
+
+and
+
+$$
+\boxed{
+\bar c_t^{(h)}
+=
+\bar h_t
+\odot
+o_t
+\odot
+(1-\tanh^2(c_t))
+}
+$$
+
+Then from
+
+$$
+c_t=f_t\odot c_{t-1}+i_t\odot g_t
+$$
+
+we obtained:
+
+$$
+\boxed{
+\bar f_t
+=
+\bar c_t\odot c_{t-1}
+}
+$$
+
+$$
+\boxed{
+\bar c_{t-1}
+=
+\bar c_t\odot f_t
+}
+$$
+
+$$
+\boxed{
+\bar i_t
+=
+\bar c_t\odot g_t
+}
+$$
+
+$$
+\boxed{
+\bar g_t
+=
+\bar c_t\odot i_t
+}
+$$
+
+---
+
+# 26. But We Are Not Finished
+
+The gradients
+
+$$
+\bar f_t,\bar i_t,\bar g_t,\bar o_t
+$$
+
+are gradients with respect to the **outputs of the activation functions**.
+
+But our parameters produce the **pre-activation values**
+
+$$
+a_t^f,a_t^i,a_t^g,a_t^o.
+$$
+
+So we must continue backward.
+
+---
+
+# 27. Backpropagating Through the Forget Gate
+
+Forward:
+
+$$
+f_t=\sigma(a_t^f).
+$$
+
+Therefore:
+
+$$
+\frac{\partial f_t}{\partial a_t^f}
+=
+f_t(1-f_t).
+$$
+
+Hence:
+
+$$
+\boxed{
+\bar a_t^f
+=
+\bar f_t
+\odot
+f_t
+\odot
+(1-f_t)
+}
+\tag{43}
+$$
+
+---
+
+# 28. Backpropagating Through the Input Gate
+
+Forward:
+
+$$
+i_t=\sigma(a_t^i).
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar a_t^i
+=
+\bar i_t
+\odot
+i_t
+\odot
+(1-i_t)
+}
+\tag{44}
+$$
+
+---
+
+# 29. Backpropagating Through the Candidate
+
+Forward:
+
+$$
+g_t=\tanh(a_t^g).
+$$
+
+Therefore:
+
+$$
+\frac{\partial g_t}{\partial a_t^g}
+=
+1-g_t^2.
+$$
+
+Thus:
+
+$$
+\boxed{
+\bar a_t^g
+=
+\bar g_t
+\odot
+(1-g_t^2)
+}
+\tag{45}
+$$
+
+---
+
+# 30. Backpropagating Through the Output Gate
+
+Forward:
+
+$$
+o_t=\sigma(a_t^o).
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar a_t^o
+=
+\bar o_t
+\odot
+o_t
+\odot
+(1-o_t)
+}
+\tag{46}
+$$
+
+---
+
+# 31. The Four Gate Pre-Activation Gradients
+
+We now have:
+
+$$
+\boxed{
+\bar a_t^f
+=
+\bar c_t
+\odot c_{t-1}
+\odot f_t(1-f_t)
+}
+\tag{47}
+$$
+
+because
+
+$$
+\bar f_t
+=
+\bar c_t\odot c_{t-1}.
+$$
+
+Similarly:
+
+$$
+\boxed{
+\bar a_t^i
+=
+\bar c_t
+\odot g_t
+\odot i_t(1-i_t)
+}
+\tag{48}
+$$
+
+$$
+\boxed{
+\bar a_t^g
+=
+\bar c_t
+\odot i_t
+\odot(1-g_t^2)
+}
+\tag{49}
+$$
+
+and
+
+$$
+\boxed{
+\bar a_t^o
+=
+\bar h_t
+\odot\tanh(c_t)
+\odot o_t(1-o_t)
+}
+\tag{50}
+$$
+
+---
+
+# 32. Why Are These Four Quantities So Important?
+
+Because
+
+$$
+a_t=Wz_t+b.
+$$
+
+The parameters directly produce \(a_t\).
+
+Therefore once we know
+
+$$
+\bar a_t,
+$$
+
+we can calculate the parameter gradients.
+
+Define:
+
+$$
+\bar a_t
+=
+\begin{bmatrix}
+\bar a_t^f\\
+\bar a_t^i\\
+\bar a_t^g\\
+\bar a_t^o
+\end{bmatrix}.
+\tag{51}
+$$
+
+This is the single error signal that flows into the master affine transformation.
+
+---
+
+# 33. Backpropagating Through the Matrix Multiplication
+
+Recall:
+
+$$
+a_t=Wz_t+b.
+$$
+
+We want:
+
+$$
+\frac{\partial L}{\partial W}
+$$
+
+and
+
+$$
+\frac{\partial L}{\partial b}.
+$$
+
+We also need:
+
+$$
+\frac{\partial L}{\partial z_t}.
+$$
+
+---
+
+# 34. Weight Gradient
+
+Consider:
+
+$$
+a_i=\sum_j W_{ij}z_j+b_i.
+$$
+
+The derivative is:
+
+$$
+\frac{\partial a_i}{\partial W_{ij}}
+=
+z_j.
+$$
+
+Therefore:
+
+$$
+\frac{\partial L}{\partial W_{ij}}
+=
+\frac{\partial L}{\partial a_i}
+\frac{\partial a_i}{\partial W_{ij}}.
+$$
+
+Hence:
+
+$$
+\boxed{
+\frac{\partial L}{\partial W_{ij}}
+=
+\bar a_i z_j
+}
+\tag{52}
+$$
+
+In matrix form:
+
+$$
+\boxed{
+\bar W
+=
+\bar a_t z_t^T
+}
+\tag{53}
+$$
+
+This is an outer product.
+
+---
+
+# 35. Why Is It an Outer Product?
+
+Suppose
+
+$$
+\bar a
+\in\mathbb R^{4H}
+$$
+
+and
+
+$$
+z\in\mathbb R^{H+D}.
+$$
+
+Then:
+
+$$
+\bar a z^T
+$$
+
+has dimensions
+
+$$
+(4H\times1)(1\times(H+D))
+$$
+
+which gives
+
+$$
+4H\times(H+D).
+$$
+
+Exactly the same shape as \(W\).
+
+---
+
+# 36. Bias Gradient
+
+We have
+
+$$
+a_i=\sum_jW_{ij}z_j+b_i.
+$$
+
+Therefore:
+
+$$
+\frac{\partial a_i}{\partial b_i}=1.
+$$
+
+Thus:
+
+$$
+\boxed{
+\frac{\partial L}{\partial b_i}
+=
+\bar a_i
+}
+\tag{54}
+$$
+
+or
+
+$$
+\boxed{
+\bar b=\bar a_t
+}
+\tag{55}
+$$
+
+for one time step.
+
+Across multiple time steps, these gradients are accumulated.
+
+---
+
+# 37. Gradient With Respect to \(z_t\)
+
+Recall:
+
+$$
+a_i=\sum_jW_{ij}z_j+b_i.
+$$
+
+For a particular \(z_j\):
+
+$$
+\frac{\partial a_i}{\partial z_j}
+=
+W_{ij}.
+$$
+
+Therefore:
+
+$$
+\frac{\partial L}{\partial z_j}
+=
+\sum_i
+\frac{\partial L}{\partial a_i}
+\frac{\partial a_i}{\partial z_j}.
+$$
+
+So:
+
+$$
+\boxed{
+\bar z_t=W^T\bar a_t
+}
+\tag{56}
+$$
+
+---
+
+# 38. Splitting \(z_t\)
+
+Recall:
+
+$$
+z_t=
+\begin{bmatrix}
+h_{t-1}\\
+x_t
+\end{bmatrix}.
+$$
+
+Therefore:
+
+$$
+\bar z_t
+=
+\begin{bmatrix}
+\bar h_{t-1}^{(z)}\\
+\bar x_t
+\end{bmatrix}.
+\tag{57}
+$$
+
+The first \(H\) elements correspond to \(h_{t-1}\).
+
+The remaining \(D\) elements correspond to \(x_t\).
+
+Therefore:
+
+$$
+\boxed{
+\bar h_{t-1}
+=
+\bar h_{t-1}^{(z)}
+}
+\tag{58}
+$$
+
+and
+
+$$
+\boxed{
+\bar x_t
+=
+\text{last }D\text{ elements of }\bar z_t
+}
+\tag{59}
+$$
+
+---
+
+# 39. But There Is Another Gradient Into \(h_{t-1}\)
+
+This is extremely important.
+
+The previous hidden state may influence the current step through
+
+$$
+z_t
+$$
+
+but it can also receive gradient from the loss associated with the next time step.
+
+Therefore, just like the cell state, the hidden state can have multiple gradient paths.
+
+Conceptually:
+
+$$
+\boxed{
+\bar h_{t-1}^{\text{total}}
+=
+\bar h_{t-1}^{(z)}
++
+\bar h_{t-1}^{\text{future}}
+}
+\tag{60}
+$$
+
+In a standard backward-through-time implementation, you maintain an accumulated hidden-state gradient and add these contributions.
+
+---
+
+# 40. Complete One-Step Backward Pass
+
+Given:
+
+$$
+\bar h_t
+$$
+
+and
+
+$$
+\bar c_t^{\text{future}},
+$$
+
+perform:
+
+### Step 1
+
+$$
+\bar o_t
+=
+\bar h_t\odot\tanh(c_t)
+$$
+
+### Step 2
+
+$$
+\bar c_t
+=
+\bar c_t^{\text{future}}
++
+\bar h_t
+\odot
+o_t
+\odot
+(1-\tanh^2(c_t))
+$$
+
+### Step 3
+
+$$
+\bar f_t
+=
+\bar c_t\odot c_{t-1}
+$$
+
+### Step 4
+
+$$
+\bar i_t
+=
+\bar c_t\odot g_t
+$$
+
+### Step 5
+
+$$
+\bar g_t
+=
+\bar c_t\odot i_t
+$$
+
+### Step 6
+
+$$
+\bar c_{t-1}
+=
+\bar c_t\odot f_t
+$$
+
+### Step 7
+
+$$
+\bar a_t^f
+=
+\bar f_t\odot f_t(1-f_t)
+$$
+
+### Step 8
+
+$$
+\bar a_t^i
+=
+\bar i_t\odot i_t(1-i_t)
+$$
+
+### Step 9
+
+$$
+\bar a_t^g
+=
+\bar g_t\odot(1-g_t^2)
+$$
+
+### Step 10
+
+$$
+\bar a_t^o
+=
+\bar o_t\odot o_t(1-o_t)
+$$
+
+### Step 11
+
+Concatenate:
+
+$$
+\bar a_t=
+\begin{bmatrix}
+\bar a_t^f\\
+\bar a_t^i\\
+\bar a_t^g\\
+\bar a_t^o
+\end{bmatrix}
+$$
+
+### Step 12
+
+$$
+\bar W_t=\bar a_tz_t^T
+$$
+
+### Step 13
+
+$$
+\bar b_t=\bar a_t
+$$
+
+### Step 14
+
+$$
+\bar z_t=W^T\bar a_t
+$$
+
+### Step 15
+
+Split:
+
+$$
+\bar z_t
+\rightarrow
+\bar h_{t-1}^{(z)},\bar x_t.
+$$
+
+This is the complete local LSTM backward pass.
+
+---
+
+# 41. The Entire Dependency Chain
+
+The most useful way to remember the LSTM is as one giant graph.
+
+Forward:
+
+$$
+h_{t-1},x_t
+$$
+
+↓
+
+$$
+z_t
+$$
+
+↓
+
+$$
+a_t=Wz_t+b
+$$
+
+↓
+
+$$
+a_t^f,a_t^i,a_t^g,a_t^o
+$$
+
+↓
+
+$$
+f_t,i_t,g_t,o_t
+$$
+
+↓
+
+$$
+c_t=f_t\odot c_{t-1}+i_t\odot g_t
+$$
+
+↓
+
+$$
+h_t=o_t\odot\tanh(c_t)
+$$
+
+↓
+
+$$
+L
+$$
+
+Backward:
+
+$$
+L
+$$
+
+↓
+
+$$
+\bar h_t
+$$
+
+↓
+
+$$
+\bar o_t,\bar c_t
+$$
+
+↓
+
+$$
+\bar f_t,\bar i_t,\bar g_t,\bar c_{t-1}
+$$
+
+↓
+
+$$
+\bar a_t^f,\bar a_t^i,\bar a_t^g,\bar a_t^o
+$$
+
+↓
+
+$$
+\bar a_t
+$$
+
+↓
+
+$$
+\bar W,\bar b,\bar z_t
+$$
+
+↓
+
+$$
+\bar h_{t-1},\bar x_t.
+$$
+
+That is the entire local computation graph.
+
+---
+
+# 42. Scalar Derivation of Every Important Derivative
+
+Now we will drill all the way down.
+
+Consider:
+
+$$
+c=fc_{\text{old}}+ig
+$$
+
+and
+
+$$
+h=o\tanh(c).
+$$
+
+Suppose:
+
+$$
+\bar h=\frac{\partial L}{\partial h}.
+$$
+
+---
+
+## 42.1 Derivative With Respect to \(o\)
+
+$$
+h=o\tanh(c)
+$$
+
+so
+
+$$
+\frac{\partial h}{\partial o}
+=
+\tanh(c).
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar o
+=
+\bar h\tanh(c)
+}
+$$
+
+---
+
+## 42.2 Derivative With Respect to \(c\)
+
+$$
+\frac{\partial h}{\partial c}
+=
+o(1-\tanh^2(c)).
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar c^{(h)}
+=
+\bar h
+o
+(1-\tanh^2(c))
+}
+$$
+
+---
+
+## 42.3 Derivative With Respect to \(f\)
+
+$$
+c=fc_{\text{old}}+ig
+$$
+
+therefore:
+
+$$
+\frac{\partial c}{\partial f}
+=
+c_{\text{old}}.
+$$
+
+Hence:
+
+$$
+\boxed{
+\bar f
+=
+\bar c c_{\text{old}}
+}
+$$
+
+---
+
+## 42.4 Derivative With Respect to \(c_{\text{old}}\)
+
+$$
+\frac{\partial c}{\partial c_{\text{old}}}
+=
+f.
+$$
+
+Hence:
+
+$$
+\boxed{
+\bar c_{\text{old}}
+=
+\bar c f
+}
+$$
+
+---
+
+## 42.5 Derivative With Respect to \(i\)
+
+$$
+\frac{\partial c}{\partial i}
+=
+g.
+$$
+
+Thus:
+
+$$
+\boxed{
+\bar i=\bar c g
+}
+$$
+
+---
+
+## 42.6 Derivative With Respect to \(g\)
+
+$$
+\frac{\partial c}{\partial g}
+=
+i.
+$$
+
+Thus:
+
+$$
+\boxed{
+\bar g=\bar c i
+}
+$$
+
+---
+
+# 43. Scalar Gate Derivatives
+
+For
+
+$$
+f=\sigma(a_f)
+$$
+
+we have:
+
+$$
+\frac{\partial f}{\partial a_f}
+=
+f(1-f).
+$$
+
+Therefore:
+
+$$
+\boxed{
+\bar a_f
+=
+\bar f f(1-f)
+}
+$$
+
+For
+
+$$
+i=\sigma(a_i):
+$$
+
+$$
+\boxed{
+\bar a_i
+=
+\bar i i(1-i)
+}
+$$
+
+For
+
+$$
+g=\tanh(a_g):
+$$
+
+$$
+\boxed{
+\bar a_g
+=
+\bar g(1-g^2)
+}
+$$
+
+For
+
+$$
+o=\sigma(a_o):
+$$
+
+$$
+\boxed{
+\bar a_o
+=
+\bar o o(1-o)
+}
+$$
+
+---
+
+# 44. Scalar Weight Derivative
+
+Suppose
+
+$$
+a_f=W_fz+b_f.
+$$
+
+Expanded:
+
+$$
+a_f
+=
+\sum_j W^f_jz_j+b_f.
+$$
+
+For a particular weight \(W^f_j\):
+
+$$
+\frac{\partial a_f}{\partial W^f_j}
+=
+z_j.
+$$
+
+Therefore:
+
+$$
+\frac{\partial L}{\partial W^f_j}
+=
+\frac{\partial L}{\partial a_f}
+\frac{\partial a_f}{\partial W^f_j}.
+$$
+
+Thus:
+
+$$
+\boxed{
+\frac{\partial L}{\partial W^f_j}
+=
+\bar a_f z_j
+}
+\tag{61}
+$$
+
+Exactly the same logic applies to the input, candidate, and output gate weights.
+
+---
+
+# 45. Scalar Input Derivative
+
+Again:
+
+$$
+a_f
+=
+\sum_jW^f_jz_j+b_f.
+$$
+
+Therefore:
+
+$$
+\frac{\partial a_f}{\partial z_j}
+=
+W^f_j.
+$$
+
+But \(z_j\) affects all four gates.
+
+Thus:
+
+$$
+\frac{\partial L}{\partial z_j}
+=
+\bar a_fW^f_j
++
+\bar a_iW^i_j
++
+\bar a_gW^g_j
++
+\bar a_oW^o_j.
+\tag{62}
+$$
+
+This is exactly what the matrix equation
+
+$$
+\bar z=W^T\bar a
+$$
+
+is doing.
+
+---
+
+# 46. Why Gradients Add
+
+This is one of the most important ideas in neural-network mathematics.
+
+Suppose:
+
+$$
+q
+\rightarrow
+a
+\rightarrow L
+$$
+
+and
+
+$$
+q
+\rightarrow
+b
+\rightarrow L.
+$$
+
+There are two paths from \(q\) to \(L\).
+
+Therefore:
+
+$$
+\frac{\partial L}{\partial q}
+=
+\frac{\partial L}{\partial a}
+\frac{\partial a}{\partial q}
++
+\frac{\partial L}{\partial b}
+\frac{\partial b}{\partial q}.
+$$
+
+That is why gradients are added at branching points.
+
+For an LSTM, this happens particularly importantly at:
+
+* \(c_t\)
+* \(h_t\)
+
+because information travels both through the current computation and across time.
+
+---
+
+# 47. LSTM Across Multiple Time Steps
+
+Now consider:
+
+$$
+x_1,x_2,\ldots,x_T.
+$$
+
+At every time step:
+
+$$
+(h_{t-1},c_{t-1},x_t)
+\rightarrow
+(h_t,c_t).
+$$
+
+The same parameters are reused:
+
+$$
+W,b.
+$$
+
+This is crucial.
+
+There is **one LSTM parameter set**, not a separate \(W_t\) for every time step.
+
+---
+
+# 48. Parameter Sharing
+
+For every \(t\):
+
+$$
+a_t=Wz_t+b.
+$$
+
+The same \(W\) and \(b\) are used.
+
+Therefore the total loss gradient is:
+
+$$
+\boxed{
+\frac{\partial L}{\partial W}
+=
+\sum_{t=1}^{T}
+\frac{\partial L}{\partial W}\bigg|_t
+}
+\tag{63}
+$$
+
+and:
+
+$$
+\boxed{
+\frac{\partial L}{\partial b}
+=
+\sum_{t=1}^{T}
+\frac{\partial L}{\partial b}\bigg|_t
+}
+\tag{64}
+$$
+
+This is why we accumulate gradients during BPTT.
+
+---
+
+# 49. Backpropagation Through Time
+
+Suppose the loss is:
+
+$$
+L=L_T
+$$
+
+only at the final time step.
+
+Then:
+
+$$
+L_T
+\rightarrow h_T
+\rightarrow
+(h_{T-1},c_{T-1})
+\rightarrow
+\cdots
+\rightarrow
+(h_1,c_1).
+$$
+
+We begin at:
+
+$$
+t=T
+$$
+
+and work backward:
+
+$$
+T,T-1,T-2,\ldots,1.
+$$
+
+This is **Backpropagation Through Time**, or BPTT.
+
+---
+
+# 50. Two Gradient States Must Be Carried
+
+At each time step during backward propagation, maintain:
+
+$$
+\bar h
+$$
+
+and
+
+$$
+\bar c.
+$$
+
+Before processing time \(t\):
+
+$$
+\bar h_t
+$$
+
+contains gradient arriving from future computation.
+
+Similarly:
+
+$$
+\bar c_t
+$$
+
+contains gradient arriving through the future cell-state path.
+
+Then the current time step adds its own contribution.
+
+---
+
+# 51. BPTT Algorithm
+
+Initialize:
+
+$$
+\bar h_{T}=0
+$$
+
+$$
+\bar c_{T}=0
+$$
+
+except for gradients coming directly from the final loss.
+
+Then for
+
+$$
+t=T,T-1,\ldots,1
+$$
+
+perform the local backward equations.
+
+At the end of each step, produce:
+
+$$
+\bar h_{t-1}
+$$
+
+and
+
+$$
+\bar c_{t-1}.
+$$
+
+These become the inputs to the next iteration.
+
+---
+
+# 52. If Every Time Step Has a Loss
+
+Suppose:
+
+$$
+L
+=
+\sum_{t=1}^{T}L_t.
+\tag{65}
+$$
+
+Then every time step produces a direct gradient:
+
+$$
+\frac{\partial L_t}{\partial h_t}.
+$$
+
+At time \(t\):
+
+$$
+\boxed{
+\bar h_t
+=
+\frac{\partial L_t}{\partial h_t}
++
+\bar h_t^{\text{future}}
+}
+\tag{66}
+$$
+
+The future gradient is added to the current loss gradient.
+
+Again:
+
+> Gradients from independent paths add.
+
+---
+
+# 53. Output Layer Example
+
+Suppose the LSTM produces:
+
+$$
+o_t^{\text{out}}
+=
+W_yh_t+b_y.
+$$
+
+Do not confuse this output preactivation with the LSTM output gate \(o_t\).
+
+To avoid confusion, call it:
+
+$$
+r_t=W_yh_t+b_y.
+\tag{67}
+$$
+
+Then:
+
+$$
+\hat y_t=\operatorname{softmax}(r_t).
+\tag{68}
+$$
+
+For cross-entropy:
+
+$$
+L_t=-\sum_k y_{t,k}\log\hat y_{t,k}.
+\tag{69}
+$$
+
+The famous simplification gives:
+
+$$
+\boxed{
+\frac{\partial L_t}{\partial r_t}
+=
+\hat y_t-y_t
+}
+\tag{70}
+$$
+
+Then:
+
+$$
+\boxed{
+\frac{\partial L_t}{\partial W_y}
+=
+(\hat y_t-y_t)h_t^T
+}
+\tag{71}
+$$
+
+and:
+
+$$
+\boxed{
+\frac{\partial L_t}{\partial b_y}
+=
+\hat y_t-y_t
+}
+\tag{72}
+$$
+
+and:
+
+$$
+\boxed{
+\bar h_t
+=
+W_y^T(\hat y_t-y_t)
+}
+\tag{73}
+$$
+
+This \(\bar h_t\) is then passed into the LSTM backward equations.
+
+---
+
+# 54. Full Network Dependency Chain
+
+If we have an output layer:
+
+$$
+x_t
+\rightarrow
+z_t
+\rightarrow
+a_t
+\rightarrow
+(f_t,i_t,g_t,o_t)
+\rightarrow
+c_t
+\rightarrow
+h_t
+\rightarrow
+r_t
+\rightarrow
+\hat y_t
+\rightarrow
+L_t.
+$$
+
+Backward:
+
+$$
+L_t
+\rightarrow
+\bar r_t
+\rightarrow
+\bar h_t
+$$
+
+then:
+
+$$
+\bar h_t
+\rightarrow
+\bar o_t,\bar c_t
+$$
+
+then:
+
+$$
+\bar c_t
+\rightarrow
+\bar f_t,\bar i_t,\bar g_t,\bar c_{t-1}
+$$
+
+then:
+
+$$
+\bar f_t,\bar i_t,\bar g_t,\bar o_t
+\rightarrow
+\bar a_t
+$$
+
+then:
+
+$$
+\bar a_t
+\rightarrow
+\bar W,\bar b,\bar z_t
+$$
+
+then:
+
+$$
+\bar z_t
+\rightarrow
+\bar h_{t-1},\bar x_t.
+$$
+
+---
+
+# 55. Matrix Form of the Four Gate Equations
+
+Instead of storing four separate matrices:
+
+$$
+W_f,W_i,W_g,W_o,
+$$
+
+we can concatenate them:
+
+$$
+W=
+\begin{bmatrix}
+W_f\\
+W_i\\
+W_g\\
+W_o
+\end{bmatrix}.
+\tag{74}
+$$
+
+Similarly:
+
+$$
+b=
+\begin{bmatrix}
+b_f\\
+b_i\\
+b_g\\
+b_o
+\end{bmatrix}.
+\tag{75}
+$$
+
+Then:
+
+$$
+a=Wz+b.
+$$
+
+This is usually easier and faster to implement.
+
+---
+
+# 56. Dimensions
+
+Let:
+
+$$
+D=\text{input dimension}
+$$
+
+$$
+H=\text{hidden dimension}.
+$$
+
+Then:
+
+| Quantity | Shape             |
+| -------- | ----------------- |
+| \(x_t\)  | \(D\)             |
+| \(h_t\)  | \(H\)             |
+| \(c_t\)  | \(H\)             |
+| \(z_t\)  | \(H+D\)           |
+| \(a_t\)  | \(4H\)            |
+| \(f_t\)  | \(H\)             |
+| \(i_t\)  | \(H\)             |
+| \(g_t\)  | \(H\)             |
+| \(o_t\)  | \(H\)             |
+| \(W\)    | \(4H\times(H+D)\) |
+| \(b\)    | \(4H\)            |
+
+---
+
+# 57. Why Concatenation Is Useful
+
+Without concatenation, we could write:
+
+$$
+a_f=W_{fh}h_{t-1}+W_{fx}x_t+b_f
+$$
+
+and similarly for every gate.
+
+That requires many matrix multiplications.
+
+With:
+
+$$
+z_t=
+\begin{bmatrix}
+h_{t-1}\\
+x_t
+\end{bmatrix},
+$$
+
+we simply use:
+
+$$
+a_t=Wz_t+b.
+$$
+
+The implementation becomes cleaner.
+
+---
+
+# 58. Equivalent Separate-Matrix Form
+
+The combined matrix is equivalent to:
+
+$$
+W_f=
+\begin{bmatrix}
+W_{fh}&W_{fx}
+\end{bmatrix}
+$$
+
+and therefore:
+
+$$
+a_f
+=
+W_{fh}h_{t-1}
++
+W_{fx}x_t
++
+b_f.
+$$
+
+Likewise:
+
+$$
+a_i
+=
+W_{ih}h_{t-1}
++
+W_{ix}x_t
++
+b_i
+$$
+
+$$
+a_g
+=
+W_{gh}h_{t-1}
++
+W_{gx}x_t
++
+b_g
+$$
+
+$$
+a_o
+=
+W_{oh}h_{t-1}
++
+W_{ox}x_t
++
+b_o.
+$$
+
+The two implementations are mathematically identical.
+
+---
+
+# 59. Numerical Stability of Sigmoid
+
+The mathematical sigmoid is:
+
+$$
+\sigma(x)=\frac{1}{1+e^{-x}}.
+$$
+
+But blindly implementing this can overflow.
+
+For large negative \(x\):
+
+$$
+e^{-x}
+$$
+
+can become enormous.
+
+A stable implementation can use:
+
+$$
+\sigma(x)
+=
+\begin{cases}
+\frac{1}{1+e^{-x}}, & x\geq0\\[6pt]
+\frac{e^x}{1+e^x}, & x<0.
+\end{cases}
+\tag{76}
+$$
+
+This matters in a C implementation.
+
+---
+
+# 60. Forward-Pass Cache
+
+Backpropagation requires quantities calculated during the forward pass.
+
+At every time step, store:
+
+$$
+x_t
+$$
+
+$$
+h_{t-1}
+$$
+
+$$
+c_{t-1}
+$$
+
+$$
+f_t
+$$
+
+$$
+i_t
+$$
+
+$$
+g_t
+$$
+
+$$
+o_t
+$$
+
+$$
+c_t
+$$
+
+and often:
+
+$$
+z_t.
+$$
+
+You can also store the preactivations:
+
+$$
+a_t^f,a_t^i,a_t^g,a_t^o.
+$$
+
+However, because:
+
+$$
+\sigma'(x)=y(1-y)
+$$
+
+and
+
+$$
+\tanh'(x)=1-y^2,
+$$
+
+you can calculate activation derivatives from the activation outputs.
+
+---
+
+# 61. Why Do We Need the Cache?
+
+Consider:
+
+$$
+\bar f_t
+=
+\bar c_t\odot c_{t-1}.
+$$
+
+To calculate this, we need:
+
+$$
+c_{t-1}.
+$$
+
+Similarly:
+
+$$
+\bar a_t^f
+=
+\bar f_t\odot f_t(1-f_t).
+$$
+
+We need:
+
+$$
+f_t.
+$$
+
+Therefore the forward pass must retain these values until the backward pass reaches the corresponding time step.
+
+---
+
+# 62. Memory Required for BPTT
+
+For a sequence of length \(T\), storing every time step requires approximately:
+
+$$
+O(T(H+D))
+$$
+
+activation memory, plus the gate states.
+
+This is one reason long sequences can be expensive.
+
+Truncated BPTT reduces this cost.
+
+---
+
+# 63. Truncated BPTT
+
+Instead of backpropagating through the entire sequence:
+
+$$
+1,\ldots,T,
+$$
+
+we choose a window length \(K\).
+
+For example:
+
+$$
+K=20.
+$$
+
+We process forward through many steps but only backpropagate through the most recent 20 steps.
+
+This limits computational and memory cost.
+
+---
+
+# 64. Gradient Descent
+
+Once all gradients are accumulated:
+
+$$
+\bar W
+=
+\frac{\partial L}{\partial W}
+$$
+
+and
+
+$$
+\bar b
+=
+\frac{\partial L}{\partial b},
+$$
+
+ordinary gradient descent updates are:
+
+$$
+W
+\leftarrow
+W-\eta\bar W
+\tag{77}
+$$
+
+$$
+b
+\leftarrow
+b-\eta\bar b.
+\tag{78}
+$$
+
+Here \(\eta\) is the learning rate.
+
+---
+
+# 65. Parameter Count
+
+For the combined LSTM matrix:
+
+$$
+W\in\mathbb R^{4H\times(H+D)}.
+$$
+
+Therefore:
+
+$$
+\#W
+=
+4H(H+D).
+$$
+
+The bias has:
+
+$$
+4H
+$$
+
+parameters.
+
+Total:
+
+$$
+\boxed{
+4H(H+D)+4H
+}
+\tag{79}
+$$
+
+or:
+
+$$
+\boxed{
+4H(H+D+1)
+}
+\tag{80}
+$$
+
+parameters.
+
+---
+
+# 66. Example Parameter Count
+
+Suppose:
+
+$$
+D=10
+$$
+
+and
+
+$$
+H=32.
+$$
+
+Then:
+
+$$
+W:
+4(32)(32+10)
+=
+128(42)
+=
+5376.
+$$
+
+Bias:
+
+$$
+4(32)=128.
+$$
+
+Total:
+
+$$
+5376+128
+=
+5504.
+$$
+
+---
+
+# 67. A Complete Scalar Dependency Chain
+
+For one hidden unit and one input connection:
+
+$$
+z_j
+$$
+
+↓
+
+$$
+a_f=\sum_jW^f_jz_j+b_f
+$$
+
+↓
+
+$$
+f=\sigma(a_f)
+$$
+
+↓
+
+$$
+c=fc_{\text{old}}+ig
+$$
+
+↓
+
+$$
+h=o\tanh(c)
+$$
+
+↓
+
+$$
+L.
+$$
+
+Backward:
+
+$$
+\frac{\partial L}{\partial h}
+$$
+
+↓
+
+$$
+\frac{\partial L}{\partial c}
+=
+\frac{\partial L}{\partial h}
+o(1-\tanh^2(c))
+$$
+
+↓
+
+$$
+\frac{\partial L}{\partial f}
+=
+\frac{\partial L}{\partial c}c_{\text{old}}
+$$
+
+↓
+
+$$
+\frac{\partial L}{\partial a_f}
+=
+\frac{\partial L}{\partial f}f(1-f)
+$$
+
+↓
+
+$$
+\frac{\partial L}{\partial W^f_j}
+=
+\frac{\partial L}{\partial a_f}z_j.
+$$
+
+This is the complete chain for one parameter.
+
+---
+
+# 68. Deriving a Weight Gradient End-to-End
+
+Let's explicitly derive one weight.
+
+Take:
+
+$$
+W^f_j.
+$$
+
+The dependency chain is:
+
+$$
+W^f_j
+\rightarrow
+a_f
+\rightarrow
+f
+\rightarrow
+c
+\rightarrow
+h
+\rightarrow
+L.
+$$
+
+Therefore:
+
+$$
+\frac{\partial L}{\partial W^f_j}
+=
+\frac{\partial L}{\partial h}
+\frac{\partial h}{\partial c}
+\frac{\partial c}{\partial f}
+\frac{\partial f}{\partial a_f}
+\frac{\partial a_f}{\partial W^f_j}.
+\tag{81}
+$$
+
+Now substitute each derivative.
+
+First:
+
+$$
+\frac{\partial L}{\partial h}
+=
+\bar h.
+$$
+
+Next:
+
+$$
+\frac{\partial h}{\partial c}
+=
+o(1-\tanh^2(c)).
+$$
+
+Next:
+
+$$
+\frac{\partial c}{\partial f}
+=
+c_{\text{old}}.
+$$
+
+Next:
+
+$$
+\frac{\partial f}{\partial a_f}
+=
+f(1-f).
+$$
+
+Finally:
+
+$$
+\frac{\partial a_f}{\partial W^f_j}
+=
+z_j.
+$$
+
+Therefore:
+
+$$
+\boxed{
+\frac{\partial L}{\partial W^f_j}
+=
+\bar h
+\cdot
+o
+\cdot
+(1-\tanh^2(c))
+\cdot
+c_{\text{old}}
+\cdot
+f(1-f)
+\cdot
+z_j
+}
+\tag{82}
+$$
+
+This is what the compact vector equations are hiding.
+
+---
+
+# 69. Why the Compact Formula Is Correct
+
+We previously derived:
+
+$$
+\bar c
+=
+\bar h o(1-\tanh^2(c)).
+$$
+
+Then:
+
+$$
+\bar f
+=
+\bar c c_{\text{old}}.
+$$
+
+Then:
+
+$$
+\bar a_f
+=
+\bar f f(1-f).
+$$
+
+Then:
+
+$$
+\bar W^f_j
+=
+\bar a_fz_j.
+$$
+
+Substituting these equations into each other produces exactly:
+
+$$
+\bar W^f_j
+=
+\bar h
+o
+(1-\tanh^2(c))
+c_{\text{old}}
+f(1-f)
+z_j.
+$$
+
+So the compact implementation is simply the chain rule organized into reusable intermediate gradients.
+
+---
+
+# 70. Why We Should Not Implement the Giant Scalar Equation
+
+Although equation (82) is mathematically useful, you should **not** implement the entire expression directly.
+
+Instead calculate:
+
+$$
+\bar o
+$$
+
+then:
+
+$$
+\bar c
+$$
+
+then:
+
+$$
+\bar f,\bar i,\bar g
+$$
+
+then:
+
+$$
+\bar a_f,\bar a_i,\bar a_g,\bar a_o
+$$
+
+then:
+
+$$
+\bar W.
+$$
+
+This mirrors the computational graph and makes debugging much easier.
+
+---
+
+# 71. The LSTM Backward Pass as a Sequence of Local Rules
+
+This is the most useful implementation perspective.
+
+Each operation has a local derivative.
+
+### Operation 1
+
+$$
+h=o\tanh(c)
+$$
+
+Backward:
+
+$$
+\bar o=\bar h\tanh(c)
+$$
+
+$$
+\bar c+=\bar h\,o(1-\tanh^2(c)).
+$$
+
+---
+
+### Operation 2
+
+$$
+c=fc_{\text{old}}+ig
+$$
+
+Backward:
+
+$$
+\bar f=\bar c\,c_{\text{old}}
+$$
+
+$$
+\bar c_{\text{old}}=\bar c\,f
+$$
+
+$$
+\bar i=\bar c\,g
+$$
+
+$$
+\bar g=\bar c\,i.
+$$
+
+---
+
+### Operation 3
+
+$$
+f=\sigma(a_f)
+$$
+
+Backward:
+
+$$
+\bar a_f=\bar f f(1-f).
+$$
+
+---
+
+### Operation 4
+
+$$
+i=\sigma(a_i)
+$$
+
+Backward:
+
+$$
+\bar a_i=\bar i i(1-i).
+$$
+
+---
+
+### Operation 5
+
+$$
+g=\tanh(a_g)
+$$
+
+Backward:
+
+$$
+\bar a_g=\bar g(1-g^2).
+$$
+
+---
+
+### Operation 6
+
+$$
+o=\sigma(a_o)
+$$
+
+Backward:
+
+$$
+\bar a_o=\bar o o(1-o).
+$$
+
+---
+
+### Operation 7
+
+$$
+a=Wz+b
+$$
+
+Backward:
+
+$$
+\bar W=\bar a z^T
+$$
+
+$$
+\bar b=\bar a
+$$
+
+$$
+\bar z=W^T\bar a.
+$$
+
+That is the entire LSTM backward pass.
+
+---
+
+# 72. Implementation-Oriented Pseudocode
+
+## Forward
+
+```text
+z = concatenate(h_prev, x)
+
+a = W * z + b
+
+af = a[0:H]
+ai = a[H:2H]
+ag = a[2H:3H]
+ao = a[3H:4H]
+
+f = sigmoid(af)
+i = sigmoid(ai)
+g = tanh(ag)
+o = sigmoid(ao)
+
+c = f * c_prev + i * g
+
+h = o * tanh(c)
+```
+
+All `*` operations between vectors here mean element-wise multiplication unless explicitly stated otherwise.
+
+---
+
+# 73. Backward Pseudocode
+
+Given:
+
+```text
+dh
+dc_future
+```
+
+calculate:
+
+```text
+do = dh * tanh(c)
+
+dc = dc_future
+     + dh * o * (1 - tanh(c)^2)
+
+df = dc * c_prev
+
+di = dc * g
+
+dg = dc * i
+
+dc_prev = dc * f
+
+daf = df * f * (1 - f)
+
+dai = di * i * (1 - i)
+
+dag = dg * (1 - g^2)
+
+dao = do * o * (1 - o)
+```
+
+Then:
+
+```text
+da = concatenate(daf, dai, dag, dao)
+
+dW = da outer_product z
+
+db = da
+
+dz = W^T * da
+```
+
+Finally:
+
+```text
+dh_prev = first H elements of dz
+
+dx = last D elements of dz
+```
+
+---
+
+# 74. Important Detail: `dc` Must Be Accumulated
+
+In real BPTT code:
+
+```text
+dc = dc_future
+```
+
+followed by:
+
+```text
+dc += dh * o * (1 - tanh(c)^2)
+```
+
+not:
+
+```text
+dc = dh * o * ...
+```
+
+The reason is that the cell state receives gradient from two routes.
+
+---
+
+# 75. Important Detail: `dh` Must Also Be Accumulated
+
+If the LSTM is connected to another layer and/or receives losses at multiple time steps, the hidden-state gradient may have multiple sources.
+
+Conceptually:
+
+```text
+dh_total =
+    dh_from_output
+    + dh_from_future
+```
+
+Then this total gradient enters the LSTM cell.
+
+---
+
+# 76. Gradient Accumulation Across Time
+
+For every time step:
+
+```text
+dW += dW_t
+db += db_t
+```
+
+At the end:
+
+```text
+W -= learning_rate * dW
+b -= learning_rate * db
+```
+
+The same parameter is responsible for every time step, so all contributions must be summed.
+
+---
+
+# 77. The Complete BPTT Algorithm
+
+Suppose:
+
+```text
+T = sequence length
+```
+
+Initialize:
+
+```text
+dW = 0
+db = 0
+dh = 0
+dc = 0
+```
+
+Then:
+
+```text
+for t = T-1 down to 0:
+
+    dh += gradient_from_output[t]
+
+    do = dh * tanh(c[t])
+
+    dc += dh * o[t] * (1 - tanh(c[t])^2)
+
+    df = dc * c[t-1]
+
+    di = dc * g[t]
+
+    dg = dc * i[t]
+
+    dc_prev = dc * f[t]
+
+    daf = df * f[t] * (1 - f[t])
+
+    dai = di * i[t] * (1 - i[t])
+
+    dag = dg * (1 - g[t]^2)
+
+    dao = do * o[t] * (1 - o[t])
+
+    da = concatenate(daf, dai, dag, dao)
+
+    dW += outer_product(da, z[t])
+
+    db += da
+
+    dz = transpose(W) * da
+
+    dh = first_H_elements(dz)
+
+    dc = dc_prev
+```
+
+The exact bookkeeping depends on whether there is an output layer and how the loss is defined, but this is the essential BPTT structure.
+
+---
+
+# 78. One Subtle Point About `dh`
+
+At the beginning of the loop:
+
+$$
+\bar h_t
+$$
+
+may contain gradient from:
+
+* the output at \(t\),
+* future recurrence.
+
+After:
+
+$$
+\bar z_t=W^T\bar a_t,
+$$
+
+the first \(H\) elements give the gradient that flows backward through the previous hidden-state connection.
+
+That becomes:
+
+$$
+\bar h_{t-1}.
+$$
+
+So the assignment:
+
+```text
+dh = dz[0:H]
+```
+
+is effectively moving the gradient one time step backward.
+
+---
+
+# 79. One Subtle Point About `dc`
+
+The cell-state gradient behaves similarly.
+
+At time \(t\):
+
+$$
+\bar c_t
+$$
+
+is used to calculate:
+
+$$
+\bar c_{t-1}
+=
+\bar c_t\odot f_t.
+$$
+
+Then:
+
+$$
+\bar c_{t-1}
+$$
+
+becomes the future contribution when processing \(t-1\).
+
+Therefore the cell-state gradient travels directly through time.
+
+---
+
+# 80. Why the Forget Gate Controls Gradient Flow
+
+The recurrence is:
+
+$$
+\bar c_{t-1}
+=
+\bar c_t\odot f_t.
+$$
+
+Therefore after several steps:
+
+$$
+\bar c_{t-k}
+\approx
+\bar c_t
+\odot
+f_t
+\odot
+f_{t-1}
+\odot\cdots
+\odot
+f_{t-k+1}
+$$
+
+ignoring other gradient contributions.
+
+If:
+
+$$
+f_j\approx1,
+$$
+
+the gradient is preserved.
+
+If:
+
+$$
+f_j\ll1,
+$$
+
+the gradient shrinks.
+
+Thus the forget gate is not merely controlling memory in the forward direction.
+
+It also controls an important component of gradient flow in the backward direction.
+
+---
+
+# 81. Why the LSTM Is Still Not Perfect
+
+The LSTM reduces the vanishing-gradient problem, but it does not mathematically guarantee perfect gradient preservation.
+
+The gradient can still be affected by:
+
+* gate saturation,
+* repeated multiplication,
+* output pathways,
+* nonlinearities,
+* parameter magnitudes,
+* sequence length.
+
+This is why practical LSTM training can still benefit from:
+
+* careful initialization,
+* gradient clipping,
+* appropriate learning rates,
+* normalization or architectural modifications.
+
+---
+
+# 82. Gradient Clipping
+
+A simple global-norm clipping strategy is:
+
+$$
+\|g\|
+=
+\sqrt{\sum_i g_i^2}.
+$$
+
+If:
+
+$$
+\|g\|>G_{\max},
+$$
+
+scale:
+
+$$
+g
+\leftarrow
+g
+\frac{G_{\max}}{\|g\|}.
+\tag{83}
+$$
+
+This prevents extremely large gradients from producing destructive parameter updates.
+
+For a C implementation, this is particularly useful once the basic LSTM is working.
+
+---
+
+# 83. Initialization
+
+A simple implementation can initialize weights with small random values.
+
+For example:
+
+$$
+W_{ij}\sim\mathcal N(0,\sigma^2).
+$$
+
+Biases are often initialized to zero, although the forget-gate bias is sometimes initialized to a positive value.
+
+The exact initialization strategy is a separate design choice; the mathematics of the LSTM does not depend on a particular initializer.
+
+---
+
+# 84. The Forget Gate Bias
+
+Suppose:
+
+$$
+b_f>0.
+$$
+
+Then initially:
+
+$$
+f=\sigma(b_f)
+$$
+
+may be greater than \(0.5\).
+
+This biases the network toward retaining information initially.
+
+For example, if:
+
+$$
+b_f=1,
+$$
+
+then:
+
+$$
+\sigma(1)\approx0.731.
+$$
+
+If:
+
+$$
+b_f=2,
+$$
+
+then:
+
+$$
+\sigma(2)\approx0.881.
+$$
+
+This is an initialization choice, not a change to the underlying equations.
+
+---
+
+# 85. Numerical Gradient Checking
+
+Before trusting a C implementation, perform finite-difference gradient checking.
+
+Suppose the parameter is:
+
+$$
+\theta.
+$$
+
+Compute:
+
+$$
+L(\theta+\epsilon)
+$$
+
+and
+
+$$
+L(\theta-\epsilon).
+$$
+
+Then approximate:
+
+$$
+\boxed{
+\frac{\partial L}{\partial\theta}
+\approx
+\frac{
+L(\theta+\epsilon)-L(\theta-\epsilon)
+}{
+2\epsilon
+}
+}
+\tag{84}
+$$
+
+Compare this to the analytical gradient.
+
+---
+
+# 86. Relative Gradient Error
+
+A useful comparison is:
+
+$$
+\text{error}
+=
+\frac{
+|g_{\text{analytic}}-g_{\text{numeric}}|
+}{
+\max(
+1,
+|g_{\text{analytic}}|,
+|g_{\text{numeric}}|
+)
+}.
+\tag{85}
+$$
+
+For a correct implementation, the numerical and analytical gradients should be close, subject to floating-point error and the choice of \(\epsilon\).
+
+---
+
+# 87. What to Gradient-Check
+
+Do not only check \(W\).
+
+Check:
+
+$$
+W
+$$
+
+$$
+b
+$$
+
+$$
+h_0
+$$
+
+$$
+c_0
+$$
+
+and potentially:
+
+$$
+x_t.
+$$
+
+Checking the input gradient is particularly useful because it tests the entire backward chain.
+
+---
+
+# 88. A Tiny One-Step Test
+
+Use:
+
+$$
+D=2
+$$
+
+$$
+H=2.
+$$
+
+Then:
+
+$$
+x_t\in\mathbb R^2
+$$
+
+$$
+h_t,c_t\in\mathbb R^2.
+$$
+
+The combined weight matrix has shape:
+
+$$
+4H\times(H+D)
+=
+8\times4.
+$$
+
+The bias has:
+
+$$
+8
+$$
+
+elements.
+
+This is small enough that you can print every intermediate quantity.
+
+---
+
+# 89. Print the Forward Pass
+
+For debugging, print:
+
+```text
+x
+h_prev
+c_prev
+
+z
+
+a_f
+a_i
+a_g
+a_o
+
+f
+i
+g
+o
+
+c
+h
+```
+
+Then verify each equation independently.
+
+---
+
+# 90. Print the Backward Pass
+
+Print:
+
+```text
+dh
+do
+dc
+
+df
+di
+dg
+
+dc_prev
+
+daf
+dai
+dag
+dao
+
+da
+
+dW
+db
+dz
+
+dh_prev
+dx
+```
+
+This makes it possible to identify exactly where a wrong value first appears.
+
+---
+
+# 91. The Most Important Mental Model
+
+Do not memorize 20 unrelated equations.
+
+Think of the LSTM as seven operations.
+
+## Forward
+
+### Operation 1
+
+$$
+z=[h_{\text{prev}},x]
+$$
+
+### Operation 2
+
+$$
+a=Wz+b
+$$
+
+### Operation 3
+
+$$
+f=\sigma(a_f)
+$$
+
+$$
+i=\sigma(a_i)
+$$
+
+$$
+g=\tanh(a_g)
+$$
+
+$$
+o=\sigma(a_o)
+$$
+
+### Operation 4
+
+$$
+c=fc_{\text{prev}}+ig
+$$
+
+### Operation 5
+
+$$
+h=o\tanh(c)
+$$
+
+---
+
+## Backward
+
+Reverse them.
+
+### Operation 5
+
+$$
+h\rightarrow o,c
+$$
+
+### Operation 4
+
+$$
+c\rightarrow f,i,g,c_{\text{prev}}
+$$
+
+### Operation 3
+
+$$
+f,i,g,o
+\rightarrow
+a_f,a_i,a_g,a_o
+$$
+
+### Operation 2
+
+$$
+a\rightarrow W,b,z
+$$
+
+### Operation 1
+
+$$
+z\rightarrow h_{\text{prev}},x.
+$$
+
+That is the LSTM.
+
+---
+
+# 92. Complete Equation Sheet
+
+## Forward
+
+$$
+z_t=
+\begin{bmatrix}
+h_{t-1}\\
+x_t
+\end{bmatrix}
+$$
+
+$$
+a_t=Wz_t+b
+$$
+
+$$
+f_t=\sigma(a_t^f)
+$$
+
+$$
+i_t=\sigma(a_t^i)
+$$
+
+$$
+g_t=\tanh(a_t^g)
+$$
+
+$$
+o_t=\sigma(a_t^o)
+$$
+
+$$
+c_t=f_t\odot c_{t-1}+i_t\odot g_t
+$$
+
+$$
+h_t=o_t\odot\tanh(c_t).
+$$
+
+---
+
+## Backward
+
+$$
+\bar o_t
+=
+\bar h_t\odot\tanh(c_t)
+$$
+
+$$
+\bar c_t
+=
+\bar c_t^{\text{future}}
++
+\bar h_t
+\odot
+o_t
+\odot
+(1-\tanh^2(c_t))
+$$
+
+$$
+\bar f_t
+=
+\bar c_t\odot c_{t-1}
+$$
+
+$$
+\bar i_t
+=
+\bar c_t\odot g_t
+$$
+
+$$
+\bar g_t
+=
+\bar c_t\odot i_t
+$$
+
+$$
+\bar c_{t-1}
+=
+\bar c_t\odot f_t
+$$
+
+$$
+\bar a_t^f
+=
+\bar f_t\odot f_t(1-f_t)
+$$
+
+$$
+\bar a_t^i
+=
+\bar i_t\odot i_t(1-i_t)
+$$
+
+$$
+\bar a_t^g
+=
+\bar g_t\odot(1-g_t^2)
+$$
+
+$$
+\bar a_t^o
+=
+\bar o_t\odot o_t(1-o_t)
+$$
+
+$$
+\bar a_t
+=
+\begin{bmatrix}
+\bar a_t^f\\
+\bar a_t^i\\
+\bar a_t^g\\
+\bar a_t^o
+\end{bmatrix}
+$$
+
+$$
+\bar W
+=
+\bar a_tz_t^T
+$$
+
+$$
+\bar b
+=
+\bar a_t
+$$
+
+$$
+\bar z_t
+=
+W^T\bar a_t
+$$
+
+$$
+\bar h_{t-1}^{(z)}
+=
+\bar z_t[0:H]
+$$
+
+$$
+\bar x_t
+=
+\bar z_t[H:H+D].
+$$
+
+---
+
+# 93. The Full Gradient Chain in One Diagram
+
+```text
+                         FORWARD
+                           │
+                           ▼
+                    h_prev , x
+                           │
+                           ▼
+                  z = [h_prev, x]
+                           │
+                           ▼
+                    a = Wz + b
+                           │
+          ┌────────────────┼────────────────┐
+          ▼                ▼                ▼
+     a_f → sigmoid     a_i → sigmoid    a_g → tanh
+          │                │                │
+          ▼                ▼                ▼
+          f                i                g
+          └────────────────┼────────────────┘
+                           │
+                           ▼
+                  c = f*c_prev + i*g
+                           │
+                           ▼
+                  h = o*tanh(c)
+                           │
+                           ▼
+                           LOSS
+                           │
+                           │
+                         BACKWARD
+                           │
+                           ▼
+                          dh
+                           │
+                ┌──────────┴──────────┐
+                ▼                     ▼
+               do                    dc
+                                      │
+                       ┌──────────────┼──────────────┐
+                       ▼              ▼              ▼
+                      df             di             dg
+                       │              │              │
+                       ▼              ▼              ▼
+                      daf            dai            dag
+                       └──────────────┼──────────────┘
+                                      │
+                                      ▼
+                                     da
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    ▼                 ▼                 ▼
+                   dW                db                dz
+                                                        │
+                                          ┌─────────────┴─────────────┐
+                                          ▼                           ▼
+                                      dh_prev                        dx
+```
+
+---
+
+# 94. The Most Important Three Backward Equations
+
+If you forget everything else, remember these three structural rules.
+
+### Rule 1: Product
+
+If
+
+$$
+y=uv,
+$$
+
+then:
+
+$$
+\bar u=\bar yv
+$$
+
+and
+
+$$
+\bar v=\bar yu.
+$$
+
+The LSTM cell update is just repeated application of this rule.
+
+---
+
+### Rule 2: Activation
+
+If
+
+$$
+y=\sigma(x),
+$$
+
+then:
+
+$$
+\bar x=\bar y\,y(1-y).
+$$
+
+If
+
+$$
+y=\tanh(x),
+$$
+
+then:
+
+$$
+\bar x=\bar y(1-y^2).
+$$
+
+---
+
+### Rule 3: Affine transformation
+
+If:
+
+$$
+y=Wx+b,
+$$
+
+then:
+
+$$
+\boxed{
+\bar W=\bar yx^T
+}
+$$
+
+$$
+\boxed{
+\bar b=\bar y
+}
+$$
+
+$$
+\boxed{
+\bar x=W^T\bar y
+}
+$$
+
+The entire LSTM backward pass is essentially these three rules applied to the computational graph.
+
+---
+
+# 95. What You Actually Need to Implement in C
+
+A minimal LSTM implementation needs:
+
+## Parameters
+
+```text
+W[4H][H+D]
+b[4H]
+```
+
+## State
+
+```text
+h[H]
+c[H]
+```
+
+## Forward cache per time step
+
+```text
+x[D]
+z[H+D]
+
+f[H]
+i[H]
+g[H]
+o[H]
+
+c[H]
+h[H]
+```
+
+## Gradients
+
+```text
+dW[4H][H+D]
+db[4H]
+
+dh[H]
+dc[H]
+
+dz[H+D]
+da[4H]
+```
+
+Then implement:
+
+```text
+forward()
+backward()
+update()
+```
+
+---
+
+# 96. Suggested C Structure
+
+A conceptual structure could be:
+
+```c
+typedef struct {
+    int input_size;
+    int hidden_size;
+
+    double *W;
+    double *b;
+
+    double *dW;
+    double *db;
+
+    double *h;
+    double *c;
+} LSTM;
+```
+
+For BPTT, the cache would normally be an array indexed by time:
+
+```c
+typedef struct {
+    double *x;
+    double *z;
+
+    double *f;
+    double *i;
+    double *g;
+    double *o;
+
+    double *c;
+    double *h;
+} LSTMCache;
+```
+
+The exact memory layout is an implementation decision.
+
+---
+
+# 97. Row-Major Flattening
+
+C does not natively provide multidimensional mathematical matrices in the way a numerical library does.
+
+You can flatten:
+
+$$
+W_{ij}
+$$
+
+into:
+
+```text
+W[i * cols + j]
+```
+
+where:
+
+```text
+cols = H + D
+```
+
+Therefore:
+
+```c
+W[i * cols + j]
+```
+
+represents:
+
+$$
+W_{ij}.
+$$
+
+---
+
+# 98. Matrix-Vector Multiplication
+
+For:
+
+$$
+a=Wz+b
+$$
+
+the C equivalent is conceptually:
+
+```c
+for (int i = 0; i < 4 * H; i++) {
+    a[i] = b[i];
+
+    for (int j = 0; j < H + D; j++) {
+        a[i] += W[i * (H + D) + j] * z[j];
+    }
+}
+```
+
+This is exactly:
+
+$$
+a_i
+=
+b_i+
+\sum_jW_{ij}z_j.
+$$
+
+---
+
+# 99. Outer Product for the Weight Gradient
+
+We derived:
+
+$$
+\bar W=\bar az^T.
+$$
+
+Therefore:
+
+```c
+for (int i = 0; i < 4 * H; i++) {
+    for (int j = 0; j < H + D; j++) {
+        dW[i * (H + D) + j]
+            += da[i] * z[j];
+    }
+}
+```
+
+This is the direct implementation of:
+
+$$
+\frac{\partial L}{\partial W_{ij}}
+=
+\bar a_i z_j.
+$$
+
+---
+
+# 100. Transposed Matrix Multiplication
+
+For:
+
+$$
+\bar z=W^T\bar a,
+$$
+
+we have:
+
+$$
+\bar z_j
+=
+\sum_iW_{ij}\bar a_i.
+$$
+
+In C:
+
+```c
+for (int j = 0; j < H + D; j++) {
+    dz[j] = 0.0;
+
+    for (int i = 0; i < 4 * H; i++) {
+        dz[j] += W[i * (H + D) + j] * da[i];
+    }
+}
+```
+
+Then:
+
+```text
+dz[0 ... H-1]
+```
+
+is the gradient for the previous hidden state.
+
+And:
+
+```text
+dz[H ... H+D-1]
+```
+
+is the gradient for the current input.
+
+---
+
+# 101. The Implementation Order I Recommend
+
+Do not immediately implement full BPTT.
+
+Build it in stages.
+
+## Stage 1
+
+Implement:
+
+```text
+sigmoid
+tanh
+```
+
+and test them.
+
+---
+
+## Stage 2
+
+Implement:
+
+```text
+matrix_vector_multiply
+```
+
+and test it independently.
+
+---
+
+## Stage 3
+
+Implement one LSTM forward step.
+
+Verify every intermediate value.
+
+---
+
+## Stage 4
+
+Implement one LSTM backward step.
+
+Use finite differences to verify:
+
+$$
+dW
+$$
+
+and:
+
+$$
+db.
+$$
+
+---
+
+## Stage 5
+
+Add a sequence of two time steps.
+
+Verify:
+
+$$
+dh_{t-1}
+$$
+
+and:
+
+$$
+dc_{t-1}.
+$$
+
+---
+
+## Stage 6
+
+Add arbitrary sequence length.
+
+---
+
+## Stage 7
+
+Add BPTT.
+
+---
+
+## Stage 8
+
+Add an output layer and loss.
+
+---
+
+## Stage 9
+
+Train on a tiny synthetic dataset.
+
+---
+
+## Stage 10
+
+Only then optimize the implementation.
+
+---
+
+# 102. Final Mental Model
+
+An LSTM is not fundamentally a mysterious new type of mathematics.
+
+It is a computational graph built from:
+
+* addition,
+* multiplication,
+* sigmoid,
+* tanh,
+* matrix multiplication,
+* parameter sharing through time.
+
+Its forward equations are:
+
+$$
+z=[h_{\text{prev}},x]
+$$
+
+$$
+a=Wz+b
+$$
+
+$$
+f=\sigma(a_f)
+$$
+
+$$
+i=\sigma(a_i)
+$$
+
+$$
+g=\tanh(a_g)
+$$
+
+$$
+o=\sigma(a_o)
+$$
+
+$$
+c=fc_{\text{prev}}+ig
+$$
+
+$$
+h=o\tanh(c).
+$$
+
+Its backward equations are simply the chain rule applied backward:
+
+$$
+\bar h
+\rightarrow
+(\bar o,\bar c)
+$$
+
+$$
+\bar c
+\rightarrow
+(\bar f,\bar i,\bar g,\bar c_{\text{prev}})
+$$
+
+$$
+(\bar f,\bar i,\bar g,\bar o)
+\rightarrow
+(\bar a_f,\bar a_i,\bar a_g,\bar a_o)
+$$
+
+$$
+\bar a
+\rightarrow
+(\bar W,\bar b,\bar z)
+$$
+
+$$
+\bar z
+\rightarrow
+(\bar h_{\text{prev}},\bar x).
+$$
+
+Across time, the same parameters are reused, so:
+
+$$
+\boxed{
+dW=\sum_t dW_t
+}
+$$
+
+and:
+
+$$
+\boxed{
+db=\sum_t db_t.
+}
+$$
+
+The cell state carries a direct temporal pathway:
+
+$$
+c_{t-1}
+\rightarrow
+c_t
+\rightarrow
+c_{t+1}
+\rightarrow\cdots
+$$
+
+whose local backward derivative is:
+
+$$
+\boxed{
+\frac{\partial c_t}{\partial c_{t-1}}
+=
+f_t.
+}
+$$
+
+That single equation explains much of the mathematical motivation behind the LSTM.
+
+---
+
+# 103. Final "Do Not Lose Track" Table
+
+| Quantity         | Why calculate it?                     | Comes from              | Used next in              |
+| ---------------- | ------------------------------------- | ----------------------- | ------------------------- |
+| \(z_t\)          | Combine \(h_{t-1}\) and \(x_t\)       | \(h_{t-1},x_t\)         | \(a_t\)                   |
+| \(a_t\)          | Raw gate values                       | \(Wz_t+b\)              | gates                     |
+| \(f_t\)          | Decide what memory to keep            | \(a_t^f\)               | \(c_t\)                   |
+| \(i_t\)          | Decide how much to write              | \(a_t^i\)               | \(c_t\)                   |
+| \(g_t\)          | Candidate information                 | \(a_t^g\)               | \(c_t\)                   |
+| \(o_t\)          | Decide what memory to expose          | \(a_t^o\)               | \(h_t\)                   |
+| \(c_t\)          | New memory                            | \(f_t,c_{t-1},i_t,g_t\) | \(h_t\), future           |
+| \(h_t\)          | Exposed hidden state                  | \(o_t,c_t\)             | output/future             |
+| \(\bar h_t\)     | Loss sensitivity to hidden state      | output backward pass    | \(o_t,c_t\)               |
+| \(\bar o_t\)     | Loss sensitivity to output gate       | \(\bar h_t\)            | \(\bar a_t^o\)            |
+| \(\bar c_t\)     | Loss sensitivity to memory            | hidden + future paths   | \(f,i,g,c_{\text{prev}}\) |
+| \(\bar f_t\)     | Sensitivity to forget gate            | \(\bar c_t,c_{t-1}\)    | \(\bar a_t^f\)            |
+| \(\bar i_t\)     | Sensitivity to input gate             | \(\bar c_t,g_t\)        | \(\bar a_t^i\)            |
+| \(\bar g_t\)     | Sensitivity to candidate              | \(\bar c_t,i_t\)        | \(\bar a_t^g\)            |
+| \(\bar c_{t-1}\) | Send memory gradient backward in time | \(\bar c_t,f_t\)        | previous timestep         |
+| \(\bar a_t\)     | Error entering affine layer           | four gate gradients     | \(dW,db,dz\)              |
+| \(\bar W_t\)     | Parameter gradient for this timestep  | \(\bar a_t,z_t\)        | accumulated \(dW\)        |
+| \(\bar b_t\)     | Bias gradient for this timestep       | \(\bar a_t\)            | accumulated \(db\)        |
+| \(\bar z_t\)     | Send gradient backward                | \(W^T\bar a_t\)         | \(h_{t-1},x_t\)           |
+
+---
+
+# 104. The Single Chain to Keep Beside Your Code
+
+When implementing, keep this next to your editor:
+
+```text
+FORWARD
+=======
+
+z = [h_prev, x]
+
+a = Wz + b
+
+f = sigmoid(a_f)
+i = sigmoid(a_i)
+g = tanh(a_g)
+o = sigmoid(a_o)
+
+c = f*c_prev + i*g
+
+h = o*tanh(c)
+
+
+BACKWARD
+========
+
+do = dh * tanh(c)
+
+dc = dc_future
+     + dh * o * (1 - tanh(c)^2)
+
+df = dc * c_prev
+di = dc * g
+dg = dc * i
+
+dc_prev = dc * f
+
+daf = df * f * (1 - f)
+dai = di * i * (1 - i)
+dag = dg * (1 - g^2)
+dao = do * o * (1 - o)
+
+da = [daf, dai, dag, dao]
+
+dW += da ⊗ z
+
+db += da
+
+dz = Wᵀ da
+
+dh_prev = dz[0:H]
+
+dx = dz[H:H+D]
+```
+
+If you understand why every line exists, you understand the mathematics required to implement an LSTM from scratch.
+
+---
+
+# 105. One Final Perspective
+
+The important transition from an ordinary neural network to an RNN, and then from an RNN to an LSTM, is not that the calculus fundamentally changes.
+
+The calculus is still:
+
+$$
+\boxed{\text{chain rule}}
+$$
+
+What changes is the **dependency graph**.
+
+For a feed-forward network:
+
+$$
+x\rightarrow h\rightarrow y\rightarrow L.
+$$
+
+For an RNN:
+
+$$
+h_{t-1},x_t\rightarrow h_t\rightarrow h_{t+1}\rightarrow\cdots
+$$
+
+so the graph extends through time.
+
+For an LSTM:
+
+$$
+h_{t-1},c_{t-1},x_t
+\rightarrow
+f_t,i_t,g_t,o_t
+\rightarrow
+c_t
+\rightarrow
+h_t.
+$$
+
+The extra state
+
+$$
+c_t
+$$
+
+creates an additional temporal pathway.
+
+Everything else follows from carefully applying the chain rule to that graph.
+
+The practical skill is therefore not memorizing LSTM equations.
+
+It is learning to look at:
+
+$$
+\boxed{
+\text{variable}
+\rightarrow
+\text{operation}
+\rightarrow
+\text{next variable}
+}
+$$
+
+and ask:
+
+> **If the loss changes by a tiny amount, how does that change flow backward through this operation?**
+
+Once that becomes automatic, the LSTM equations stop being a collection of formulas and become a direct consequence of the computational graph.
