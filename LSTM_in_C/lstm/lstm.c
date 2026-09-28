@@ -22,3 +22,14 @@ LSTM* lstm_create(int H, int V) {
 
     return lstm;
 }
+
+void lstm_free(LSTM* lstm) {
+    if(!lstm) return;
+
+    matrix_free(lstm->W);
+    matrix_free(lstm->b);
+    matrix_free(lstm->Wy);
+    matrix_free(lstm->by);
+
+    free(lstm);
+}

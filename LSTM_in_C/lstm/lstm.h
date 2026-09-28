@@ -15,6 +15,6 @@ typedef struct {
 } LSTM;
 
 LSTM* lstm_create(int H, int V);
-
+void lstm_free(LSTM* lstm);
 
 #endif
