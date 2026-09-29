@@ -1,6 +1,8 @@
 #include "lstm.h"
 #include <matrix/matrix.h>
+#include <matrix/operations.h>
 #include <stdlib.h>
+#include <math.h>
 
 LSTM* lstm_create(int H, int V) {
     LSTM* lstm = malloc(sizeof(LSTM));
@@ -32,4 +34,33 @@ void lstm_free(LSTM* lstm) {
     matrix_free(lstm->by);
 
     free(lstm);
+}
+
+void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c) {
+    int H = lstm->H;
+    Matrix* z = matrix_create(lstm->H + lstm->V, 1);
+    matrix_init(z, 0.0);
+    for(int i = 0; i < h->rows; i++) {
+        z->values[i][0] = h->values[i][0];
+    }
+    z->values[H + x_idx][0] = 1; // one-hot
+
+    Matrix* W_dot_z = dot(lstm->W, z);
+    Matrix* a = add(W_dot_z, lstm->b);
+
+    matrix_free(W_dot_z);
+
+    
+
+    for(int j = 0; j < H; j++) {
+        double f = sigmoid(a->values[j][0]);
+        double i = sigmoid(a->values[H + j][0]);
+        double g = tanh(a->values[2*H + j][0]);
+        double o = sigmoid(a->values[3*H + j][0]);
+
+        c->values[j][0] = f * c->values[j][0] + i * g;
+        h->values[j][0] = tanh(c->values[j][0]) * o;
+    }
+    matrix_free(a);
+    matrix_free(z);
 }
