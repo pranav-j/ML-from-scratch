@@ -64,3 +64,14 @@ void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c) {
     matrix_free(a);
     matrix_free(z);
 }
+
+double lstm_output_loss(LSTM* lstm, Matrix* h, int target) {
+    Matrix* Wy_dot_h = dot(lstm->Wy, h);
+    Matrix* r = add(Wy_dot_h, lstm->by);
+    Matrix* prob = softmax(r);
+    matrix_free(Wy_dot_h);
+    matrix_free(r);
+    double loss = -log(prob->values[target][0]);
+    matrix_free(prob);
+    return loss;
+}

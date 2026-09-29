@@ -17,5 +17,6 @@ typedef struct {
 LSTM* lstm_create(int H, int V);
 void lstm_free(LSTM* lstm);
 void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c);
+double lstm_output_loss(LSTM* lstm, Matrix* h, int target);
 
 #endif
