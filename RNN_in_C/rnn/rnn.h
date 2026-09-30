@@ -2,7 +2,7 @@
 #define RNN_H
 
 #include <matrix/matrix.h>
-#include "../data_ops/data.h"
+#include <data_ops/data.h>
 
 #define T 25
 

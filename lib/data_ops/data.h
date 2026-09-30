@@ -3,6 +3,8 @@
 
 #include <matrix/matrix.h>
 
+#define CORPUS_PATH "../data/corpus.txt"
+
 typedef struct {
     char*  text;
     int text_length;

@@ -1,13 +1,15 @@
 CC       = cc
 LIBDIR   = ../lib
 MATRIX   = $(LIBDIR)/matrix/libmatrix.a
+DATA     = $(LIBDIR)/data_ops/libdata.a
+LIBS     = $(MATRIX) $(DATA)
 # -MMD -MP makes the compiler emit a .d file recording which headers each
 # source pulled in, so editing a header rebuilds everything that includes it.
 CFLAGS   = -O2 -Wall -Wextra -Werror -I$(LIBDIR) -MMD -MP
 LDLIBS   = -lm
 
 # --- Shared objects (used by both targets) ---
-SHARED_SRCS = data_ops/data.c rnn/rnn.c
+SHARED_SRCS = rnn/rnn.c
 SHARED_OBJS = $(SHARED_SRCS:.c=.o)
 
 # --- Main training binary ---
@@ -24,11 +26,11 @@ DEPS = $(OBJS:.o=.d) $(GC_OBJS:.o=.d)
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS) $(MATRIX)
-	$(CC) $(OBJS) $(MATRIX) $(LDLIBS) -o $@
+$(TARGET): $(OBJS) $(LIBS)
+	$(CC) $(OBJS) $(LIBS) $(LDLIBS) -o $@
 
-$(GC_TARGET): $(GC_OBJS) $(MATRIX)
-	$(CC) $(GC_OBJS) $(MATRIX) $(LDLIBS) -o $@
+$(GC_TARGET): $(GC_OBJS) $(LIBS)
+	$(CC) $(GC_OBJS) $(LIBS) $(LDLIBS) -o $@
 
 # --- Debug builds ---
 # Convenience target: build training binary with sanitizers.
@@ -42,9 +44,12 @@ gc-debug: CFLAGS += -O0 -g -fsanitize=address,undefined
 gc-debug: LDLIBS += -fsanitize=address,undefined
 gc-debug: clean $(GC_TARGET)
 
-# --- Library ---
+# --- Libraries ---
 $(MATRIX): $(wildcard $(LIBDIR)/matrix/*.c) $(wildcard $(LIBDIR)/matrix/*.h)
 	$(MAKE) -C $(LIBDIR)/matrix
+
+$(DATA): $(wildcard $(LIBDIR)/data_ops/*.c) $(wildcard $(LIBDIR)/data_ops/*.h)
+	$(MAKE) -C $(LIBDIR)/data_ops
 
 # --- Compilation rule ---
 %.o: %.c
@@ -55,6 +60,7 @@ clean:
 
 distclean: clean
 	$(MAKE) -C $(LIBDIR)/matrix clean
+	$(MAKE) -C $(LIBDIR)/data_ops clean
 
 -include $(DEPS)
 

@@ -1,6 +1,6 @@
 #include <matrix/matrix.h>
 #include <matrix/operations.h>
-#include "data_ops/data.h"
+#include <data_ops/data.h>
 #include "rnn/rnn.h"
 
 #include <stdio.h>
@@ -9,7 +9,7 @@
 
 
 int main(void) {
-    Corpus* c = corpus_load("data/corpus.txt");
+    Corpus* c = corpus_load(CORPUS_PATH);
     printf("Text length %d \n", c->text_length);
     printf("Vocab size %d \n", c->vocab_size);
 
