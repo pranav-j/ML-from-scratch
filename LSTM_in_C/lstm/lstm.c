@@ -75,3 +75,12 @@ double lstm_output_loss(LSTM* lstm, Matrix* h, int target) {
     matrix_free(prob);
     return loss;
 }
+
+double lstm_forward(LSTM* lstm, const int* chunk, Matrix* h, Matrix* c) {
+    double loss = 0.0;
+    for(int t = 0; t < T; t++) {
+        lstm_step(lstm, chunk[t], h, c);
+        loss += lstm_output_loss(lstm, h, chunk[t + 1]);
+    }
+    return loss;
+}
