@@ -10,16 +10,15 @@ Companion to `rnn_math_from_first_principles.md`. The math doc stays clean for s
 RNN_in_C/
 ├── main.c                    training loop, chunk building
 ├── gradient_check.c          separate binary — finite-difference verification
-├── data_ops/
-│   ├── data.h                Corpus struct, one_hot
-│   └── data.c
 └── rnn/
     ├── rnn.h                 RNN, RNNGradients, RNNCache; function declarations
     └── rnn.c                 rnn_step, rnn_forward, rnn_backward,
                               gradients_clip, rnn_update, rnn_sample,
                               plus softmax and static helpers
 
-lib/matrix/                   shared matrix library (used by both binaries)
+lib/matrix/                   shared matrix library (used by every project)
+lib/data_ops/                 Corpus struct, one_hot, CORPUS_PATH — shared too
+data/corpus.txt               the training corpus, shared across projects
 ```
 
 ---
