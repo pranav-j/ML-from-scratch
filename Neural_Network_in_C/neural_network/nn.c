@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "nn.h"
-#include "activation.h"
+#include <activations/activations.h>
 #include <matrix/matrix.h>
 #include <matrix/operations.h>
 

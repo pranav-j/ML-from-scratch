@@ -1,8 +1,9 @@
 CC       = cc
 LIBDIR   = ../lib
 MATRIX   = $(LIBDIR)/matrix/libmatrix.a
+ACT      = $(LIBDIR)/activations/libactivations.a
 DATA     = $(LIBDIR)/data_ops/libdata.a
-LIBS     = $(MATRIX) $(DATA)
+LIBS     = $(MATRIX) $(DATA) $(ACT)
 # -MMD -MP makes the compiler emit a .d file recording which headers each
 # source pulled in, so editing a header rebuilds everything that includes it.
 CFLAGS   = -O2 -Wall -Wextra -Werror -I$(LIBDIR) -MMD -MP
@@ -48,6 +49,9 @@ gc-debug: clean $(GC_TARGET)
 $(MATRIX): $(wildcard $(LIBDIR)/matrix/*.c) $(wildcard $(LIBDIR)/matrix/*.h)
 	$(MAKE) -C $(LIBDIR)/matrix
 
+$(ACT): $(wildcard $(LIBDIR)/activations/*.c) $(wildcard $(LIBDIR)/activations/*.h)
+	$(MAKE) -C $(LIBDIR)/activations
+
 $(DATA): $(wildcard $(LIBDIR)/data_ops/*.c) $(wildcard $(LIBDIR)/data_ops/*.h)
 	$(MAKE) -C $(LIBDIR)/data_ops
 
@@ -60,6 +64,7 @@ clean:
 
 distclean: clean
 	$(MAKE) -C $(LIBDIR)/matrix clean
+	$(MAKE) -C $(LIBDIR)/activations clean
 	$(MAKE) -C $(LIBDIR)/data_ops clean
 
 -include $(DEPS)

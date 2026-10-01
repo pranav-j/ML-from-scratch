@@ -1,24 +1,28 @@
 CC       = cc
 LIBDIR   = ../lib
 MATRIX   = $(LIBDIR)/matrix/libmatrix.a
+ACT      = $(LIBDIR)/activations/libactivations.a
 # -MMD -MP makes the compiler emit a .d file recording which headers each
 # source pulled in, so editing a header rebuilds everything that includes it.
 CFLAGS   = -O2 -Wall -Wextra -I$(LIBDIR) -MMD -MP
 LDLIBS   = -lm
 
-SRCS     = main.c neural_network/nn.c neural_network/activation.c mnist_ops/mnist.c
+SRCS     = main.c neural_network/nn.c mnist_ops/mnist.c
 OBJS     = $(SRCS:.c=.o)
 DEPS     = $(OBJS:.o=.d)
 TARGET   = nn
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS) $(MATRIX)
-	$(CC) $(OBJS) $(MATRIX) $(LDLIBS) -o $@
+$(TARGET): $(OBJS) $(MATRIX) $(ACT)
+	$(CC) $(OBJS) $(MATRIX) $(ACT) $(LDLIBS) -o $@
 
 # Delegate to the shared library's own Makefile so it is always up to date.
 $(MATRIX): $(wildcard $(LIBDIR)/matrix/*.c) $(wildcard $(LIBDIR)/matrix/*.h)
 	$(MAKE) -C $(LIBDIR)/matrix
+
+$(ACT): $(wildcard $(LIBDIR)/activations/*.c) $(wildcard $(LIBDIR)/activations/*.h)
+	$(MAKE) -C $(LIBDIR)/activations
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -29,6 +33,7 @@ clean:
 # Also cleans the shared library.
 distclean: clean
 	$(MAKE) -C $(LIBDIR)/matrix clean
+	$(MAKE) -C $(LIBDIR)/activations clean
 
 # Pull in the generated header dependencies. The leading '-' means "don't
 # complain if they don't exist yet" (they won't, on a clean tree).

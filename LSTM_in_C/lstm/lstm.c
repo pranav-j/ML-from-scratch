@@ -1,6 +1,7 @@
 #include "lstm.h"
 #include <matrix/matrix.h>
 #include <matrix/operations.h>
+#include <activations/activations.h>
 #include <stdlib.h>
 #include <math.h>
 
