@@ -24,10 +24,21 @@ typedef struct {
     Matrix* z[T];
 } LSTMCache;
 
+typedef struct {
+    Matrix* dW;      // 4H × (H+V)   all four gates stacked: f, i, g, o
+    Matrix* db;      // 4H × 1
+
+    Matrix* dWy;     // V × H 
+    Matrix* dby;     // V × 1
+} LSTMGradients;
+
 LSTM* lstm_create(int H, int V);
 void lstm_free(LSTM* lstm);
 LSTMCache* lstm_cache_create(int H, int V);
 void lstm_cache_free(LSTMCache* cache);
+LSTMGradients* lstm_gradients_create(int H, int V);
+void lstm_gradients_zero(LSTMGradients* grads);
+void lstm_gradients_free(LSTMGradients* grads);
 
 void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c);
 double lstm_output_loss(LSTM* lstm, Matrix* h, int target);

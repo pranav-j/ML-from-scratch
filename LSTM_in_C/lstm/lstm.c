@@ -62,6 +62,40 @@ void lstm_cache_free(LSTMCache* cache) {
     free(cache);
 }
 
+LSTMGradients* lstm_gradients_create(int H, int V) {
+    LSTMGradients* grads = malloc(sizeof(LSTMGradients));
+    if(!grads) return NULL;
+
+    grads->dW = matrix_create(4*H, H+V);
+    grads->db = matrix_create(4*H, 1);
+    grads->dWy = matrix_create(V, H);
+    grads->dby = matrix_create(V, 1);
+
+    lstm_gradients_zero(grads);
+
+    return grads;
+}
+
+void lstm_gradients_zero(LSTMGradients* grads) {
+    if(!grads) return;
+
+    matrix_init(grads->dW, 0.0);
+    matrix_init(grads->db, 0.0);
+    matrix_init(grads->dWy, 0.0);
+    matrix_init(grads->dby, 0.0);
+}
+
+void lstm_gradients_free(LSTMGradients* grads) {
+    if(!grads) return;
+
+    matrix_free(grads->dW);
+    matrix_free(grads->db);
+    matrix_free(grads->dWy);
+    matrix_free(grads->dby);
+
+    free(grads);
+}
+
 void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c) {
     int H = lstm->H;
     Matrix* z = matrix_create(lstm->H + lstm->V, 1);
