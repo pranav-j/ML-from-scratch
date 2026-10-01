@@ -37,6 +37,31 @@ void lstm_free(LSTM* lstm) {
     free(lstm);
 }
 
+LSTMCache* lstm_cache_create(int H, int V) {
+    LSTMCache* cache = malloc(sizeof(LSTMCache));
+    if(!cache) return NULL;
+
+    for(int t = 0; t <= T; t++) {cache->h[t] = matrix_create(H, 1); matrix_init(cache->h[t], 0.0);}
+    for(int t = 0; t <= T; t++) {cache->c[t] = matrix_create(H, 1); matrix_init(cache->c[t], 0.0);}
+    for(int t = 0; t < T; t++) {cache->probs[t] = matrix_create(V, 1); matrix_init(cache->probs[t], 0.0);}
+    for(int t = 0; t < T; t++) {cache->gates[t] = matrix_create(4*H, 1); matrix_init(cache->gates[t], 0.0);}
+    for(int t = 0; t < T; t++) {cache->z[t] = matrix_create(H + V, 1); matrix_init(cache->z[t], 0.0);}
+
+    return cache;
+}
+
+void lstm_cache_free(LSTMCache* cache) {
+    if(!cache) return;
+
+    for(int t = 0; t <= T; t++) matrix_free(cache->h[t]);
+    for(int t = 0; t <= T; t++) matrix_free(cache->c[t]);
+    for(int t = 0; t < T; t++) matrix_free(cache->probs[t]);
+    for(int t = 0; t < T; t++) matrix_free(cache->gates[t]);
+    for(int t = 0; t < T; t++) matrix_free(cache->z[t]);
+
+    free(cache);
+}
+
 void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c) {
     int H = lstm->H;
     Matrix* z = matrix_create(lstm->H + lstm->V, 1);
@@ -84,4 +109,4 @@ double lstm_forward(LSTM* lstm, const int* chunk, Matrix* h, Matrix* c) {
         loss += lstm_output_loss(lstm, h, chunk[t + 1]);
     }
     return loss;
-}
+}   
