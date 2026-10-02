@@ -36,6 +36,7 @@ LSTM* lstm_create(int H, int V);
 void lstm_free(LSTM* lstm);
 LSTMCache* lstm_cache_create(int H, int V);
 void lstm_cache_free(LSTMCache* cache);
+void lstm_cache_carry(LSTMCache* cache);
 LSTMGradients* lstm_gradients_create(int H, int V);
 void lstm_gradients_zero(LSTMGradients* grads);
 void lstm_gradients_free(LSTMGradients* grads);
