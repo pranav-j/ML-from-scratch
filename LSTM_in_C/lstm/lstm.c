@@ -69,6 +69,11 @@ void lstm_cache_carry(LSTMCache* cache) {
     }
 }
 
+void lstm_cache_reset_state(LSTMCache* cache) {
+    matrix_init(cache->h[0], 0.0);
+    matrix_init(cache->c[0], 0.0);
+}
+
 LSTMGradients* lstm_gradients_create(int H, int V) {
     LSTMGradients* grads = malloc(sizeof(LSTMGradients));
     if(!grads) return NULL;
