@@ -40,8 +40,8 @@ LSTMGradients* lstm_gradients_create(int H, int V);
 void lstm_gradients_zero(LSTMGradients* grads);
 void lstm_gradients_free(LSTMGradients* grads);
 
-void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c);
-double lstm_output_loss(LSTM* lstm, Matrix* h, int target);
-double lstm_forward(LSTM* lstm, const int* chunk, Matrix* h, Matrix* c);
+void lstm_step(LSTM* lstm, LSTMCache* cache, int t, int x_idx);
+double lstm_output_loss(LSTM* lstm, LSTMCache* cache, int t, int target);
+double lstm_forward(LSTM* lstm, LSTMCache* cache, const int* chunk);
 
 #endif

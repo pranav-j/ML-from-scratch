@@ -96,16 +96,15 @@ void lstm_gradients_free(LSTMGradients* grads) {
     free(grads);
 }
 
-void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c) {
+void lstm_step(LSTM* lstm, LSTMCache* cache, int t, int x_idx) {
     int H = lstm->H;
-    Matrix* z = matrix_create(lstm->H + lstm->V, 1);
-    matrix_init(z, 0.0);
-    for(int i = 0; i < h->rows; i++) {
-        z->values[i][0] = h->values[i][0];
+    matrix_init(cache->z[t], 0.0);
+    for(int i = 0; i < cache->h[t]->rows; i++) {
+        cache->z[t]->values[i][0] = cache->h[t]->values[i][0];
     }
-    z->values[H + x_idx][0] = 1; // one-hot
+    cache->z[t]->values[H + x_idx][0] = 1; // one-hot
 
-    Matrix* W_dot_z = dot(lstm->W, z);
+    Matrix* W_dot_z = dot(lstm->W, cache->z[t]);
     Matrix* a = add(W_dot_z, lstm->b);
 
     matrix_free(W_dot_z);
@@ -118,17 +117,24 @@ void lstm_step(LSTM* lstm, int x_idx, Matrix* h, Matrix* c) {
         double g = tanh(a->values[2*H + j][0]);
         double o = sigmoid(a->values[3*H + j][0]);
 
-        c->values[j][0] = f * c->values[j][0] + i * g;
-        h->values[j][0] = tanh(c->values[j][0]) * o;
+        cache->gates[t]->values[j][0] = f;
+        cache->gates[t]->values[H + j][0] = i;
+        cache->gates[t]->values[2*H + j][0] = g;
+        cache->gates[t]->values[3*H + j][0] = o;
+
+        cache->c[t+1]->values[j][0] = f * cache->c[t]->values[j][0] + i * g;
+        cache->h[t+1]->values[j][0] = tanh(cache->c[t+1]->values[j][0]) * o;
     }
     matrix_free(a);
-    matrix_free(z);
 }
 
-double lstm_output_loss(LSTM* lstm, Matrix* h, int target) {
-    Matrix* Wy_dot_h = dot(lstm->Wy, h);
+double lstm_output_loss(LSTM* lstm, LSTMCache* cache, int t, int target) {
+    Matrix* Wy_dot_h = dot(lstm->Wy, cache->h[t+1]);
     Matrix* r = add(Wy_dot_h, lstm->by);
     Matrix* prob = softmax(r);
+    for(int i = 0; i < prob->rows; i++) {
+        cache->probs[t]->values[i][0] = prob->values[i][0];
+    }
     matrix_free(Wy_dot_h);
     matrix_free(r);
     double loss = -log(prob->values[target][0]);
@@ -136,11 +142,11 @@ double lstm_output_loss(LSTM* lstm, Matrix* h, int target) {
     return loss;
 }
 
-double lstm_forward(LSTM* lstm, const int* chunk, Matrix* h, Matrix* c) {
+double lstm_forward(LSTM* lstm, LSTMCache* cache, const int* chunk) {
     double loss = 0.0;
     for(int t = 0; t < T; t++) {
-        lstm_step(lstm, chunk[t], h, c);
-        loss += lstm_output_loss(lstm, h, chunk[t + 1]);
+        lstm_step(lstm, cache, t, chunk[t]);
+        loss += lstm_output_loss(lstm, cache, t, chunk[t + 1]);
     }
     return loss;
-}   
+}
