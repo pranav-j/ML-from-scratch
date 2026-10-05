@@ -162,3 +162,79 @@ double lstm_forward(LSTM* lstm, LSTMCache* cache, const int* chunk) {
     }
     return loss;
 }
+
+void lstm_backward(LSTM* lstm, LSTMCache* cache, LSTMGradients* grads, int* chunk) {
+    int H = lstm->H;
+    Matrix* dh_next = matrix_create(H, 1);
+    matrix_init(dh_next, 0.0);
+    Matrix* dc_next = matrix_create(H, 1);
+    matrix_init(dc_next, 0.0);
+    Matrix* da   = matrix_create(4 * H, 1);
+    Matrix* Wy_T = transpose(lstm->Wy);
+    Matrix* W_T  = transpose(lstm->W);
+
+    for(int t = T - 1; t >= 0; t--) {
+        // Stage A: undo the output layer
+        Matrix* dr = matrix_copy(cache->probs[t]);
+        dr->values[chunk[t+1]][0] -= 1.0;
+        Matrix* h_transpose = transpose(cache->h[t+1]);
+        Matrix* dr_dot_h_transpose = dot(dr, h_transpose);
+        matrix_free(h_transpose);
+        matrix_add_inplace(grads->dWy, dr_dot_h_transpose);
+        matrix_add_inplace(grads->dby, dr);
+
+        matrix_free(dr_dot_h_transpose);
+
+        Matrix* dh = dot(Wy_T, dr);
+        matrix_free(dr);
+        matrix_add_inplace(dh, dh_next);
+
+        // Stage B: undo the cell
+        for(int j = 0; j < H; j++) {
+            double f      = cache->gates[t]->values[j][0];
+            double i      = cache->gates[t]->values[H + j][0];
+            double g      = cache->gates[t]->values[2 * H + j][0];
+            double o      = cache->gates[t]->values[3 * H + j][0];
+            double c_prev = cache->c[t]->values[j][0];
+            double c      = cache->c[t + 1]->values[j][0];
+            double tc     = tanh(c);
+            double dh_j   = dh->values[j][0];
+            double dcn_j  = dc_next->values[j][0];
+
+            double d_o = dh_j * tc;
+            double dc  = dh_j * o * (1.0 - tc * tc) + dcn_j;
+
+            double df = dc * c_prev;
+            double di = dc * g;
+            double dg = dc * i;
+
+            da->values[j][0]         = df  * f * (1.0 - f);
+            da->values[H + j][0]     = di  * i * (1.0 - i);
+            da->values[2 * H + j][0] = dg  * (1.0 - g * g);
+            da->values[3 * H + j][0] = d_o * o * (1.0 - o);
+
+            dc_next->values[j][0] = dc * f;
+        }
+        matrix_free(dh);
+
+        // Stage C: undo a = W·z + b
+        Matrix* z_T    = transpose(cache->z[t]);
+        Matrix* da_z_T = dot(da, z_T);              // 4H×1 · 1×(H+V) = 4H×(H+V), same as W
+        matrix_add_inplace(grads->dW, da_z_T);
+        matrix_free(z_T);
+        matrix_free(da_z_T);
+
+        matrix_add_inplace(grads->db, da);
+
+        Matrix* dz = dot(W_T, da);                  // (H+V)×4H · 4H×1 = (H+V)×1
+        for (int j = 0; j < H; j++)
+            dh_next->values[j][0] = dz->values[j][0];
+        matrix_free(dz);
+    }
+
+    matrix_free(Wy_T);
+    matrix_free(W_T);  
+    matrix_free(da);
+    matrix_free(dh_next);
+    matrix_free(dc_next);
+}

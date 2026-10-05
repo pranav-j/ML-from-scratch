@@ -13,11 +13,12 @@ int main(void) {
     printf("Vocab size %d \n", corpus->vocab_size);
 
     LSTM* lstm = lstm_create(100, corpus->vocab_size);
-    int num_chunks = corpus->text_length/T;
+    int num_chunks = (corpus->text_length - 1)/T;
     LSTMCache* cache = lstm_cache_create(lstm->H, lstm->V);
     int epochs = 1;
 
     for(int epoch = 0; epoch < epochs; epoch++) {
+        lstm_cache_reset_state(cache);
         for(int chunk_num = 0; chunk_num<num_chunks; chunk_num++) {
             int chunk[T + 1];
             for(int i = 0; i < T + 1; i++) {
@@ -28,11 +29,10 @@ int main(void) {
             lstm_cache_carry(cache);
             printf("Loss at chunk_num %d : %f \n", chunk_num, loss);
         }
-        lstm_cache_reset_state(cache);
     }
-    
 
     lstm_free(lstm);
+    lstm_cache_free(cache);
     corpus_free(corpus);
     return 0;
 }
