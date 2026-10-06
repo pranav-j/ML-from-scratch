@@ -238,3 +238,10 @@ void lstm_backward(LSTM* lstm, LSTMCache* cache, LSTMGradients* grads, int* chun
     matrix_free(dh_next);
     matrix_free(dc_next);
 }
+
+void lstm_update(LSTM* lstm, LSTMGradients* grads, double lr) {
+    matrix_update(lstm->W, grads->dW, lr);
+    matrix_update(lstm->b, grads->db, lr);
+    matrix_update(lstm->Wy, grads->dWy, lr);
+    matrix_update(lstm->by, grads->dby, lr);
+}

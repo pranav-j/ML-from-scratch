@@ -47,5 +47,6 @@ double lstm_output_loss(LSTM* lstm, LSTMCache* cache, int t, int target);
 double lstm_forward(LSTM* lstm, LSTMCache* cache, const int* chunk);
 
 void lstm_backward(LSTM* lstm, LSTMCache* cache, LSTMGradients* grads, int* chunk);
+void lstm_update(LSTM* lstm, LSTMGradients* grads, double lr);
 
 #endif
