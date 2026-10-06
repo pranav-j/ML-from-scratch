@@ -14,16 +14,30 @@ OBJS   = $(SRCS:.c=.o)
 DEPS   = $(OBJS:.o=.d)
 TARGET = lstm_
 
+# --- Gradient checker: separate binary, run once to verify backward ---   # NEW
+GC_SRCS = gradient_check.c lstm/lstm.c                                     # NEW
+GC_OBJS = $(GC_SRCS:.c=.o)                                                 # NEW
+GC_DEPS = $(GC_OBJS:.o=.d)                                                 # NEW
+GC_BIN  = gradient_check                                                   # NEW
+
 all: $(TARGET)
 
 $(TARGET): $(OBJS) $(LIBS)
 	$(CC) $(OBJS) $(LIBS) $(LDLIBS) -o $@
+
+$(GC_BIN): $(GC_OBJS) $(LIBS)                                              # NEW
+	$(CC) $(GC_OBJS) $(LIBS) $(LDLIBS) -o $@                               # NEW
 
 # --- Debug build ---
 # Convenience target: build with sanitizers.
 debug: CFLAGS += -O0 -g -fsanitize=address,undefined
 debug: LDLIBS += -fsanitize=address,undefined
 debug: clean $(TARGET)
+
+# --- Gradient check: always sanitized, always rebuilt from scratch ---     # NEW
+gradcheck: CFLAGS += -O0 -g -fsanitize=address,undefined                   # NEW
+gradcheck: LDLIBS += -fsanitize=address,undefined                          # NEW
+gradcheck: clean $(GC_BIN)                                                 # NEW
 
 # --- Libraries ---
 $(MATRIX): $(wildcard $(LIBDIR)/matrix/*.c) $(wildcard $(LIBDIR)/matrix/*.h)
@@ -39,14 +53,14 @@ $(DATA): $(wildcard $(LIBDIR)/data_ops/*.c) $(wildcard $(LIBDIR)/data_ops/*.h)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-clean:
-	rm -f $(OBJS) $(DEPS) $(TARGET)
+clean:                                                                     # CHANGED
+	rm -f $(OBJS) $(GC_OBJS) $(DEPS) $(GC_DEPS) $(TARGET) $(GC_BIN)
 
 distclean: clean
 	$(MAKE) -C $(LIBDIR)/matrix clean
 	$(MAKE) -C $(LIBDIR)/activations clean
 	$(MAKE) -C $(LIBDIR)/data_ops clean
 
--include $(DEPS)
+-include $(DEPS) $(GC_DEPS)                                                # CHANGED
 
-.PHONY: all clean distclean debug
+.PHONY: all clean distclean debug gradcheck                                # CHANGED
