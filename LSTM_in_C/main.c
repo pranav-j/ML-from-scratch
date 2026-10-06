@@ -15,7 +15,9 @@ int main(void) {
     LSTM* lstm = lstm_create(100, corpus->vocab_size);
     int num_chunks = (corpus->text_length - 1)/T;
     LSTMCache* cache = lstm_cache_create(lstm->H, lstm->V);
+    LSTMGradients* grads = lstm_gradients_create(lstm->H, lstm->V);
     int epochs = 1;
+    double LR = .01;
 
     for(int epoch = 0; epoch < epochs; epoch++) {
         lstm_cache_reset_state(cache);
@@ -26,6 +28,9 @@ int main(void) {
                 chunk[i] = corpus->char_to_index[ch];
             }
             double loss = lstm_forward(lstm, cache, chunk);
+            lstm_gradients_zero(grads);
+            lstm_backward(lstm, cache, grads, chunk);
+            lstm_update(lstm, grads, LR);
             lstm_cache_carry(cache);
             printf("Loss at chunk_num %d : %f \n", chunk_num, loss);
         }
