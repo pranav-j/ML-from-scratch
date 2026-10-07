@@ -2,6 +2,7 @@
 #define LSTM_H
 
 #include <matrix/matrix.h>
+#include <data_ops/data.h>
 
 #define T 25
 
@@ -48,5 +49,7 @@ double lstm_forward(LSTM* lstm, LSTMCache* cache, const int* chunk);
 
 void lstm_backward(LSTM* lstm, LSTMCache* cache, LSTMGradients* grads, int* chunk);
 void lstm_update(LSTM* lstm, LSTMGradients* grads, double lr);
+
+void lstm_sample(LSTM* lstm, Corpus* corpus, char seed_char, int n);
 
 #endif

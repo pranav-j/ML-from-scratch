@@ -40,6 +40,8 @@ int main(void) {
         loss_avg = 0.0;
     }
 
+    lstm_sample(lstm, corpus, 'a', 200);
+
     lstm_free(lstm);
     lstm_cache_free(cache);
     corpus_free(corpus);

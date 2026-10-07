@@ -4,6 +4,7 @@
 #include <activations/activations.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdio.h>
 
 LSTM* lstm_create(int H, int V) {
     LSTM* lstm = malloc(sizeof(LSTM));
@@ -244,4 +245,43 @@ void lstm_update(LSTM* lstm, LSTMGradients* grads, double lr) {
     matrix_update(lstm->b, grads->db, lr);
     matrix_update(lstm->Wy, grads->dWy, lr);
     matrix_update(lstm->by, grads->dby, lr);
+}
+
+static int sample_from(Matrix* p) {
+    double r = (double)rand() / ((double)RAND_MAX + 1.0);
+    double cumulative = 0.0;
+    for (int k = 0; k < p->rows; k++) {
+        cumulative += p->values[k][0];
+        if (r < cumulative) return k;
+    }
+    return p->rows - 1;  // floating-point roundoff guard
+}
+
+void lstm_sample(LSTM* lstm, Corpus* corpus, char seed_char, int n) {
+    LSTMCache* cache = lstm_cache_create(lstm->H, lstm->V);
+    if (!cache) return;
+
+    int current_index = corpus->char_to_index[(unsigned char)seed_char];
+    putchar(corpus->index_to_char[current_index]);
+
+    for (int k = 0; k < n; k++) {
+        lstm_step(lstm, cache, 0, current_index);
+
+        Matrix* Wy_dot_h = dot(lstm->Wy, cache->h[1]);
+        Matrix* r = add(Wy_dot_h, lstm->by);
+        Matrix* p = softmax(r);
+        current_index = sample_from(p);
+        putchar(corpus->index_to_char[current_index]);
+
+        matrix_free(Wy_dot_h);
+        matrix_free(r);
+        matrix_free(p);
+
+        for (int j = 0; j < lstm->H; j++) {
+            cache->h[0]->values[j][0] = cache->h[1]->values[j][0];
+            cache->c[0]->values[j][0] = cache->c[1]->values[j][0];
+        }
+    }
+    putchar('\n');
+    lstm_cache_free(cache);
 }
