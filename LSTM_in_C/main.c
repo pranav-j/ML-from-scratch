@@ -16,8 +16,9 @@ int main(void) {
     int num_chunks = (corpus->text_length - 1)/T;
     LSTMCache* cache = lstm_cache_create(lstm->H, lstm->V);
     LSTMGradients* grads = lstm_gradients_create(lstm->H, lstm->V);
-    int epochs = 1;
+    int epochs = 10;
     double LR = .01;
+    double loss_avg = 0.0;
 
     for(int epoch = 0; epoch < epochs; epoch++) {
         lstm_cache_reset_state(cache);
@@ -32,12 +33,16 @@ int main(void) {
             lstm_backward(lstm, cache, grads, chunk);
             lstm_update(lstm, grads, LR);
             lstm_cache_carry(cache);
-            printf("Loss at chunk_num %d : %f \n", chunk_num, loss);
+            loss_avg += loss;
+            // printf("Loss at chunk_num %d : %f \n", chunk_num, loss);
         }
+        printf("Loss at Epoch %d : %f \n", epoch, loss_avg/num_chunks);
+        loss_avg = 0.0;
     }
 
     lstm_free(lstm);
     lstm_cache_free(cache);
     corpus_free(corpus);
+    lstm_gradients_free(grads);
     return 0;
 }
